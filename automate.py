@@ -35,6 +35,16 @@ def writeFile(file, data_out):
     for line in data_out:
       f.write("\t".join(line) + "\n")
 
+def writeFitData(file, conc_std, abs_std, fit_slope, fit_int):
+  with open(file + '.fit', 'w') as f:
+
+    f.write("#Slope	#Intercept\n")
+    f.write(str(fit_slope) + "\t" + str(fit_int) + "\n")
+    f.write("#Conc	#Absorbance (blank substracted)\n")
+    data_out = [[str(conc_std[x]), str(abs_std[x])] for x in range(len(conc_std))]
+    for line in data_out:
+      f.write("\t".join(line) + "\n")
+
 
 def checkBlank(raw_blk, tolerance=1):
   # FUTURE FEATURE -- can add some checks for outliers in the blanks -- will need to trouble shoot a bit
@@ -62,7 +72,7 @@ def fitStandards(raw_std, abs_blk, omit_lower=0, omit_upper=1, omit_outlier=Fals
 # Adding in finding outliers will be tricky, this might require user input or something more advanced
   [fit_slope, fit_int] = np.polyfit(abs_std[omit_lower:len(abs_std)-omit_upper], conc_std[omit_lower:len(abs_std)-omit_upper], 1)
 
-  return fit_slope, fit_int, conc_std, abs_std
+  return float(fit_slope), float(fit_int), conc_std, abs_std
 
 def processData(plate_data, plate_format):
   loc_blk = []
@@ -166,6 +176,7 @@ for file in file_list:
   raw_blk, raw_std, raw_data = processData(plate_data, plate_format)
   abs_blk = checkBlank(raw_blk)
   [fit_slope, fit_int, conc_std, abs_std] = fitStandards(raw_std, abs_blk, 0, 1, False)
+  writeFitData(file, conc_std, abs_std, fit_slope, fit_int)
   all_data = calcData(raw_data, abs_blk, fit_slope, fit_int)
   data_out = formatOutput(all_data)
   writeFile(file, data_out)
