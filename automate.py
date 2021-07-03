@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import numpy as np
 from os import listdir
+import json
 import re
 
 
@@ -168,6 +169,21 @@ def plotting(abs_std, conc_std, fit_slope, fit_int):
   _ = plt.legend()
   plt.show()
 
+def writeDictionary(raw_data, abs_blk, fit_slope, fit_int):
+  # This is quick and dirty to enable combine.py processing. Can improve elegance here later.
+  all_data = {}
+  for device_key in raw_data:
+    all_data[device_key] = []
+    for time_key in raw_data[device_key]:
+      time_in = time_key
+      abs_in = np.mean(raw_data[device_key][time_key] - abs_blk)
+      abs_sd_in = np.std(raw_data[device_key][time_key] - abs_blk)
+      conc_in = fit_slope * abs_in + fit_int
+      all_data[device_key].append([time_in, abs_in, abs_sd_in, conc_in])
+  with open(file + '.dict', 'w') as f:
+    json.dump(all_data, f)
+
+
 
 ###################
 file_list = getFileList()
@@ -177,10 +193,10 @@ for file in file_list:
   abs_blk = checkBlank(raw_blk)
   [fit_slope, fit_int, conc_std, abs_std] = fitStandards(raw_std, abs_blk, 0, 1, False)
   writeFitData(file, conc_std, abs_std, fit_slope, fit_int)
+  writeDictionary(raw_data, abs_blk, fit_slope, fit_int)
   all_data = calcData(raw_data, abs_blk, fit_slope, fit_int)
   data_out = formatOutput(all_data)
   writeFile(file, data_out)
-
 
 
 

@@ -32,3 +32,6 @@ May add other data processing types as needed.
 
 Dilutions will have to added as a later improvement, possibly as an additional file.
 
+[Combining]
+Combining outputs is done in a unique folder with a file.list, which lists each file in relative path to combine.
+#Need to add error handling if file.list does not exist
