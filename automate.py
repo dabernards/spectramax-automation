@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 import numpy as np
 from os import listdir
 import json
@@ -27,9 +27,18 @@ def loadFiles(file):
     if 'delimiter' not in locals():
       delimiter = f.read(1)
     plate_format = [line.strip().split(delimiter) for line in f if line.strip()!='']
-  #extract units -- will need to clean up formatting after
-  std_units = plate_format.pop(0)[0].strip()
-  return plate_data, plate_format, std_units
+  #extract units and omit limits if present -- will need to clean up formatting after
+  if (len(plate_format[0])==1):
+    std_units = plate_format.pop(0)[0].strip()
+    omit_upper=1; omit_lower=0
+  elif (len(plate_format[0])==3):
+    std_units, omit_lower, omit_upper = plate_format.pop(0)
+  else:
+    print("Error parsing .spec file!!! Incorrect 1st line arguments.")
+
+  return plate_data, plate_format, std_units, int(omit_lower), int(omit_upper)
+
+
 
 def writeFile(file, data_out):
   with open(file + '.out', 'w') as f:
@@ -188,10 +197,10 @@ def writeDictionary(raw_data, abs_blk, fit_slope, fit_int):
 ###################
 file_list = getFileList()
 for file in file_list:
-  plate_data, plate_format, std_units = loadFiles(file)
+  plate_data, plate_format, std_units, omit_lower, omit_upper = loadFiles(file)
   raw_blk, raw_std, raw_data = processData(plate_data, plate_format)
   abs_blk = checkBlank(raw_blk)
-  [fit_slope, fit_int, conc_std, abs_std] = fitStandards(raw_std, abs_blk, 0, 1, False)
+  [fit_slope, fit_int, conc_std, abs_std] = fitStandards(raw_std, abs_blk, omit_lower, omit_upper, False)
   writeFitData(file, conc_std, abs_std, fit_slope, fit_int)
   writeDictionary(raw_data, abs_blk, fit_slope, fit_int)
   all_data = calcData(raw_data, abs_blk, fit_slope, fit_int)

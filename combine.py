@@ -17,6 +17,9 @@ def loadAllData():
       if key not in all_data:
         all_data[key] = []
       all_data[key].extend(data_in[key])
+  for key in all_data:
+    all_data[key].sort()
+
   return all_data
 
 def formatOutput(all_data):
