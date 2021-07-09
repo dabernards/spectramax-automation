@@ -10,8 +10,7 @@ DEBUG=False
 
 def loadSettings():
   # Default settings provided here; settings.yml is loaded, for all variables loaded that appear in default settings will be loaded as global variables.
-  default_settings = {'delimiter': '\t', 'omit_lower': 0, 'omit_upper': 1, 'elution_volume': 0.5, 'file_list': [name[:-4] for name in listdir() if name[-3:]=='txt' and name[:-3]+'spec' in listdir()]}
-
+  default_settings = {'delimiter': '\t', 'omit_lower': 0, 'omit_upper': 1, 'elution_volume': 0.5, 'file_list': [name[:-4] for name in listdir() if name[-3:]=='txt' and name[:-3]+'spec' in listdir()], 'std_units': "[\u03bcg/ml]"}
   try:
     yaml_in = yaml.load(open("settings.yml"), Loader=yaml.Loader)
   except:
@@ -25,10 +24,6 @@ def loadSettings():
     if DEBUG: print(var, globals()[var])
 
   
-
-def checkFileList(file_list):
-  return files
-
 def loadFiles(file):
   # First bit of these text files is pesky, so ignore that initial error. Unclear if this gets replicated in windows or mac. Open read only. 
   #  Matches against lines with double tab or tab and digit (that's the start of the temperature); ignores empty lines, strips whitespace and splits the by tab
@@ -38,19 +33,9 @@ def loadFiles(file):
 
   # Read in comma delimited descriptor file
   with open(file + '.spec', errors="ignore", mode="r") as f:
-    if 'delimiter' not in locals():
-      delimiter = f.read(1)
     plate_format = [line.strip().split(delimiter) for line in f if line.strip()!='']
   #extract units and omit limits if present -- will need to clean up formatting after
-  if (len(plate_format[0])==1):
-    std_units = plate_format.pop(0)[0].strip()
-    omit_upper=1; omit_lower=0
-  elif (len(plate_format[0])==3):
-    std_units, omit_lower, omit_upper = plate_format.pop(0)
-  else:
-    print("Error parsing .spec file!!! Incorrect 1st line arguments.")
-
-  return plate_data, plate_format, std_units, int(omit_lower), int(omit_upper)
+  return plate_data, plate_format
 
 
 
@@ -79,7 +64,7 @@ def checkBlank(raw_blk, tolerance=1):
   return abs_blk
 
 
-def fitStandards(raw_std, abs_blk, omit_lower=0, omit_upper=1, omit_outlier=False):
+def fitStandards(raw_std, abs_blk, omit_lower, omit_upper, omit_outlier=False):
   # Pass in raw standard data and averaged blk values from checkBlank()
   # [FUTURE FEATURE] omit_outlier gives option to find outliers (will need to define) and omit from fitting
   # Average all abs_in data
@@ -137,7 +122,7 @@ def processData(plate_data, plate_format):
   # Put standards into raw_std dictionary
   raw_std = {}
   for key in loc_std:
-    raw_std[key] = [float(plate_data[row][col]) for [row,col] in loc_std[key] ]
+    raw_std[key] = [ float(plate_data[row][col]) for [row,col] in loc_std[key] ]
 
 
   raw_data = {}
@@ -212,10 +197,10 @@ def writeDictionary(raw_data, abs_blk, fit_slope, fit_int):
 loadSettings()
 
 for file in file_list:
-  plate_data, plate_format, std_units, omit_lower, omit_upper = loadFiles(file)
+  plate_data, plate_format = loadFiles(file)
   raw_blk, raw_std, raw_data = processData(plate_data, plate_format)
   abs_blk = checkBlank(raw_blk)
-  [fit_slope, fit_int, conc_std, abs_std] = fitStandards(raw_std, abs_blk, omit_lower, omit_upper, False)
+  [fit_slope, fit_int, conc_std, abs_std] = fitStandards(raw_std, abs_blk, omit_lower, omit_upper)
   writeFitData(file, conc_std, abs_std, fit_slope, fit_int)
   writeDictionary(raw_data, abs_blk, fit_slope, fit_int)
   all_data = calcData(raw_data, abs_blk, fit_slope, fit_int)
