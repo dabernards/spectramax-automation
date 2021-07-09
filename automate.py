@@ -3,17 +3,31 @@ import numpy as np
 from os import listdir
 import json
 import re
-
+import yaml
 
 
 DEBUG=False
 
-def getFileList():
-  # Looks a files in directory and matches *.txt files that have a corresponding .spec file
-  #returns file name without suffix
-  txt_files = [name[:-4] for name in listdir() if name[-3:]=='txt' and name[:-3]+'spec' in listdir()]
+def loadSettings():
+  # Default settings provided here; settings.yml is loaded, for all variables loaded that appear in default settings will be loaded as global variables.
+  default_settings = {'delimiter': '\t', 'omit_lower': 0, 'omit_upper': 1, 'elution_volume': 0.5, 'file_list': [name[:-4] for name in listdir() if name[-3:]=='txt' and name[:-3]+'spec' in listdir()]}
 
-  return txt_files
+  try:
+    yaml_in = yaml.load(open("settings.yml"), Loader=yaml.Loader)
+  except:
+    yaml_in = default_settings
+
+  for var in default_settings.keys():
+    if var in yaml_in:
+      globals()[var] = yaml_in[var]
+    else:
+      globals()[var] = default_settings[var]
+    if DEBUG: print(var, globals()[var])
+
+  
+
+def checkFileList(file_list):
+  return files
 
 def loadFiles(file):
   # First bit of these text files is pesky, so ignore that initial error. Unclear if this gets replicated in windows or mac. Open read only. 
@@ -195,7 +209,8 @@ def writeDictionary(raw_data, abs_blk, fit_slope, fit_int):
 
 
 ###################
-file_list = getFileList()
+loadSettings()
+
 for file in file_list:
   plate_data, plate_format, std_units, omit_lower, omit_upper = loadFiles(file)
   raw_blk, raw_std, raw_data = processData(plate_data, plate_format)
