@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import numpy as np
-from os import listdir
-import json
+import os
 import re
+import json
 import yaml
 
 
@@ -10,7 +10,12 @@ DEBUG=False
 
 def loadSettings():
   # Default settings provided here; settings.yml is loaded, for all variables loaded that appear in default settings will be loaded as global variables.
-  default_settings = {'delimiter': '\t', 'omit_lower': 0, 'omit_upper': 1, 'elution_volume': 0.5, 'file_list': [name[:-4] for name in listdir() if name[-3:]=='txt' and name[:-3]+'spec' in listdir()], 'std_units': "[\u03bcg/ml]"}
+  default_settings = {
+                      'delimiter': '\t', 
+                      'omit_lower': 0, 'omit_upper': 1, 
+                      'elution_volume': 0.5, 'std_units': "[\u03bcg/ml]",
+                      'file_list': [name[:-4] for name in os.listdir() if name[-3:]=='txt' and name[:-3]+'spec' in os.listdir()]
+                      }
   try:
     yaml_in = yaml.load(open("settings.yml"), Loader=yaml.Loader)
   except:
@@ -25,8 +30,9 @@ def loadSettings():
 
   
 def loadFiles(file):
-  # First bit of these text files is pesky, so ignore that initial error. Unclear if this gets replicated in windows or mac. Open read only. 
-  #  Matches against lines with double tab or tab and digit (that's the start of the temperature); ignores empty lines, strips whitespace and splits the by tab
+  # First bit of these text files is pesky, so ignore that initial error. 
+  # Unclear if this gets replicated in windows or mac. Open read only. 
+  # Matches against lines with double tab or tab and digit (that's the start of the temperature); ignores empty lines, strips whitespace and splits the by tab
   with open(file + '.txt', errors='ignore', mode='r') as f:
     plate_data = [line.strip().split('\t') for line in f if re.match('\t[1-9|\t]', line[0:2]) and line.strip()!='']
   temperature = plate_data[0].pop(0)
@@ -34,7 +40,6 @@ def loadFiles(file):
   # Read in comma delimited descriptor file
   with open(file + '.spec', errors="ignore", mode="r") as f:
     plate_format = [line.strip().split(delimiter) for line in f if line.strip()!='']
-  #extract units and omit limits if present -- will need to clean up formatting after
   return plate_data, plate_format
 
 
@@ -78,7 +83,7 @@ def fitStandards(raw_std, abs_blk, omit_lower, omit_upper, omit_outlier=False):
   abs_std_sd = [abs_std[x] for x in sorted_list]
   conc_std = [conc_std[x] for x in sorted_list]
 
-# Adding in finding outliers will be tricky, this might require user input or something more advanced
+  # Adding in finding outliers will be tricky, this might require user input or something more advanced
   [fit_slope, fit_int] = np.polyfit(abs_std[omit_lower:len(abs_std)-omit_upper], conc_std[omit_lower:len(abs_std)-omit_upper], 1)
 
   return float(fit_slope), float(fit_int), conc_std, abs_std
@@ -206,8 +211,4 @@ for file in file_list:
   all_data = calcData(raw_data, abs_blk, fit_slope, fit_int)
   data_out = formatOutput(all_data)
   writeFile(file, data_out)
-
-
-
-
 
