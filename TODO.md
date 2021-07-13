@@ -2,6 +2,7 @@
 
 ## Features to add/improve
 
+- [ ] Module to address how day zero is treated -- use/ignore d0 conc data, make zero=0, generate d0 if does not exist
 - [ ] Improve data flow and functions -- functions only for data that needs solid outputs?
 - [x] Additional module to generate the html for the data file list (integrate however is fastest for now)
 - [ ] Additional module to calculate mass, cumulative mass, and release rate
