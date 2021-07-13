@@ -117,7 +117,7 @@ def processData(plate_data, plate_format):
         data_name = data_name.strip()
         for item in params.split('_'):
           if item[0]=="d":
-            data_time=int(item[1:].strip())
+            data_time=float(item[1:].strip())
           elif item[0]=="x":
             data_dilution=float(item[1:].strip())
           elif item[0]=="n":
