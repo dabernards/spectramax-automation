@@ -151,17 +151,14 @@ def processData(plate_data, plate_format):
   for device_key in loc_data:
     for time_key in loc_data[device_key]:
       dilution_data[device_key][time_key] = np.mean(dilution_data[device_key][time_key])
-    
+
 
 
   return raw_blk, raw_std, raw_data, dilution_data
 
 def formatOutput(json_data, write_data=True):
   all_data = {}
-#  print(json_data)
   for device_key in json_data:
-#    print(json_data[device_key])
-#    print(len(json_data[device_key]), len(json_data[device_key][0]))
     time_in=[]; abs_in=[]; abs_sd_in=[]; conc_in=[]; dilution_in=[]
     for x in range(len(json_data[device_key])):
       time_in.append(json_data[device_key][x][0])
