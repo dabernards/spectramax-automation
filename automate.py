@@ -118,7 +118,7 @@ def processData(plate_data, plate_format):
         data_name = data_name.strip()
         for item in params.split('_'):
           if item[0]=="d":
-            data_time=float(item[1:].strip())
+            data_time=int(item[1:].strip())
           elif item[0]=="x":
             data_dilution=float(item[1:].strip())
           elif item[0]=="n":
@@ -157,7 +157,29 @@ def processData(plate_data, plate_format):
 
   return raw_blk, raw_std, raw_data, dilution_data
 
-def formatOutput(all_data):
+def formatOutput(json_data, write_data=True):
+  all_data = {}
+#  print(json_data)
+  for device_key in json_data:
+#    print(json_data[device_key])
+#    print(len(json_data[device_key]), len(json_data[device_key][0]))
+    time_in=[]; abs_in=[]; abs_sd_in=[]; conc_in=[]; dilution_in=[]
+    for x in range(len(json_data[device_key])):
+      time_in.append(json_data[device_key][x][0])
+      abs_in.append(json_data[device_key][x][1])
+      abs_sd_in.append(json_data[device_key][x][2])
+      conc_in.append(json_data[device_key][x][3])
+      dilution_in.append(json_data[device_key][x][4])
+
+    sorted_list = np.argsort(time_in)
+    abs_in = [abs_in[x] for x in sorted_list]
+    abs_in_sd = [abs_sd_in[x] for x in sorted_list]
+    dilution_in = [dilution_in[x] for x in sorted_list]
+    conc_in = [conc_in[x] for x in sorted_list]
+    time_in = [time_in[x] for x in sorted_list]
+    all_data[device_key] = [time_in, abs_in, abs_in_sd, conc_in, dilution_in]
+
+
   # Gives element of all_data with max size
   row_output = len(all_data[max(all_data, key=lambda k: len(all_data[k][0]))][0])
   data_out = [[] for x in range(row_output+1)]
@@ -174,6 +196,12 @@ def formatOutput(all_data):
         data_out[x+1].extend("" for x in range(4))
         continue
       data_out[x+1].extend(str(all_data[device][y][x]) for y in range(4))
+
+  if write_data:
+    with open(file + '.out', 'w') as f:
+      for line in data_out:
+        f.write("\t".join(line) + "\n")
+
   return data_out
 
 def calcData(raw_data, abs_blk, fit_slope, fit_int):
@@ -203,20 +231,43 @@ def plotting(abs_std, conc_std, fit_slope, fit_int):
 
 def writeDictionary(raw_data, dilution_data, abs_blk, fit_slope, fit_int):
   # This is quick and dirty to enable combine.py processing. Can improve elegance here later.
-  all_data = {}
+  json_data = {}
   for device_key in raw_data:
-    all_data[device_key] = []
+    json_data[device_key] = []
     for time_key in raw_data[device_key]:
       time_in = time_key
       abs_in = np.mean(raw_data[device_key][time_key] - abs_blk)
       abs_sd_in = np.std(raw_data[device_key][time_key] - abs_blk)
       dilution_in = dilution_data[device_key][time_key]
       conc_in = (fit_slope * abs_in + fit_int) * dilution_data[device_key][time_key]
-      all_data[device_key].append([time_in, abs_in, abs_sd_in, conc_in, dilution_in])
+      json_data[device_key].append([time_in, abs_in, abs_sd_in, conc_in, dilution_in])
   with open(file + '.dict', 'w') as f:
-    json.dump(all_data, f)
+    json.dump(json_data, f)
 
+  return json_data
 
+def sortData(json_data):
+  all_data = {}
+  print(json_data)
+  for device_key in json_data:
+#    print(json_data[device_key])
+#    print(len(json_data[device_key]), len(json_data[device_key][0]))
+    time_in=[]; abs_in=[]; abs_sd_in=[]; conc_in=[]; dilution_in=[]
+    for x in range(len(json_data[device_key])):
+      time_in.append(json_data[device_key][x][0])
+      abs_in.append(json_data[device_key][x][1])
+      abs_sd_in.append(json_data[device_key][x][2])
+      conc_in.append(json_data[device_key][x][3])
+      dilution_in.append(json_data[device_key][x][4])
+
+    sorted_list = np.argsort(time_in)
+    abs_in = [abs_in[x] for x in sorted_list]
+    abs_in_sd = [abs_sd_in[x] for x in sorted_list]
+    dilution_in = [dilution_in[x] for x in sorted_list]
+    conc_in = [conc_in[x] for x in sorted_list]
+    time_in = [time_in[x] for x in sorted_list]
+    all_data[device_key] = [time_in, abs_in, abs_in_sd, conc_in, dilution_in]
+  return all_data
 
 ###################
 loadSettings()
@@ -228,8 +279,7 @@ for file in file_list:
   abs_blk = checkBlank(raw_blk)
   [fit_slope, fit_int, conc_std, abs_std] = fitStandards(raw_std, abs_blk, omit_lower, omit_upper)
   writeFitData(file, conc_std, abs_std, fit_slope, fit_int)
-  writeDictionary(raw_data, dilution_data, abs_blk, fit_slope, fit_int)
-  all_data = calcData(raw_data, abs_blk, fit_slope, fit_int)
-  data_out = formatOutput(all_data)
-  writeFile(file, data_out)
-
+  json_data = writeDictionary(raw_data, dilution_data, abs_blk, fit_slope, fit_int)
+  data_out = formatOutput(json_data)
+#  writeFile(file, data_out)
+  
