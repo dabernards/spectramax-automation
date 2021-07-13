@@ -4,7 +4,7 @@ import os
 import re
 import json
 import yaml
-
+# import argparse ## https://docs.python.org/3/library/argparse.html
 
 DEBUG=False
 
@@ -40,6 +40,7 @@ def loadFiles(file):
   # Read in comma delimited descriptor file
   with open(file + '.spec', errors="ignore", mode="r") as f:
     plate_format = [line.strip().split(delimiter) for line in f if line.strip()!='']
+
   return plate_data, plate_format
 
 
@@ -111,15 +112,24 @@ def processData(plate_data, plate_format):
 
       # all other items are considered data and go into loc_data
       else:
-        [data_name, data_time] = plate_format[row][col].split('_')
+        data_dilution = 1
+        data_time = -1
+        [data_name, params] = plate_format[row][col].split('-')
         data_name = data_name.strip()
-        data_time=int(data_time[1:])
+        for item in params.split('_'):
+          if item[0]=="d":
+            data_time=float(item[1:].strip())
+          elif item[0]=="x":
+            data_dilution=float(item[1:].strip())
+          elif item[0]=="n":
+            data_name=item[1:].strip()
+          else: pass #for now we just use these two parameters
         if data_name not in loc_data:
           loc_data[data_name] = {}
+        if data_time==-1: data_time=data_name
         if data_time not in loc_data[data_name]:
           loc_data[data_name][data_time] = []
-        loc_data[data_name][data_time].append([row, col])
-
+        loc_data[data_name][data_time].append((row, col, data_dilution))
 
   raw_blk = [ float(plate_data[row][col]) for [row, col] in loc_blk ]
   ## FUTURE FEATURE -- checkBlank -- this should get integrated into checkBlank behavior
@@ -131,13 +141,21 @@ def processData(plate_data, plate_format):
 
 
   raw_data = {}
+  dilution_data = {}
   for device_key in loc_data:
     raw_data[device_key] = {}
+    dilution_data[device_key] = {}
     for time_key in loc_data[device_key]:
-      raw_data[device_key][time_key] = [ float(plate_data[row][col]) for [row, col] in loc_data[device_key][time_key]]
+      raw_data[device_key][time_key] = [ float(plate_data[row][col]) for (row, col, dilution) in loc_data[device_key][time_key] ]
+      dilution_data[device_key][time_key] = [ dilution for (row, col, dilution) in loc_data[device_key][time_key] ]
+  # Inelegant way, just want to flatten dilution data -- risky for unaware users
+  for device_key in loc_data:
+    for time_key in loc_data[device_key]:
+      dilution_data[device_key][time_key] = np.mean(dilution_data[device_key][time_key])
+    
 
 
-  return raw_blk, raw_std, raw_data
+  return raw_blk, raw_std, raw_data, dilution_data
 
 def formatOutput(all_data):
   # Gives element of all_data with max size
@@ -171,8 +189,9 @@ def calcData(raw_data, abs_blk, fit_slope, fit_int):
     abs_in = [abs_in[x] for x in sorted_list]
     abs_in_sd = [abs_sd_in[x] for x in sorted_list]
     time_in = [time_in[x] for x in sorted_list]
-    conc_in = [fit_slope * x + fit_int for x in abs_in]
-    all_data[device_key] = [time_in, abs_in, abs_in_sd, conc_in]
+    dilution_in = dilution_data[device_key][time_key]
+    conc_in = [(fit_slope * x + fit_int) * dilution_data[device_key][time_key] for x in abs_in]
+    all_data[device_key] = [time_in, abs_in, abs_in_sd, conc_in, dilution_in]
   return all_data
 
 def plotting(abs_std, conc_std, fit_slope, fit_int):
@@ -182,7 +201,7 @@ def plotting(abs_std, conc_std, fit_slope, fit_int):
   _ = plt.legend()
   plt.show()
 
-def writeDictionary(raw_data, abs_blk, fit_slope, fit_int):
+def writeDictionary(raw_data, dilution_data, abs_blk, fit_slope, fit_int):
   # This is quick and dirty to enable combine.py processing. Can improve elegance here later.
   all_data = {}
   for device_key in raw_data:
@@ -191,8 +210,9 @@ def writeDictionary(raw_data, abs_blk, fit_slope, fit_int):
       time_in = time_key
       abs_in = np.mean(raw_data[device_key][time_key] - abs_blk)
       abs_sd_in = np.std(raw_data[device_key][time_key] - abs_blk)
-      conc_in = fit_slope * abs_in + fit_int
-      all_data[device_key].append([time_in, abs_in, abs_sd_in, conc_in])
+      dilution_in = dilution_data[device_key][time_key]
+      conc_in = (fit_slope * abs_in + fit_int) * dilution_data[device_key][time_key]
+      all_data[device_key].append([time_in, abs_in, abs_sd_in, conc_in, dilution_in])
   with open(file + '.dict', 'w') as f:
     json.dump(all_data, f)
 
@@ -203,11 +223,12 @@ loadSettings()
 
 for file in file_list:
   plate_data, plate_format = loadFiles(file)
-  raw_blk, raw_std, raw_data = processData(plate_data, plate_format)
+  raw_blk, raw_std, raw_data, dilution_data = processData(plate_data, plate_format)
+  #print(raw_data, dilution_data)
   abs_blk = checkBlank(raw_blk)
   [fit_slope, fit_int, conc_std, abs_std] = fitStandards(raw_std, abs_blk, omit_lower, omit_upper)
   writeFitData(file, conc_std, abs_std, fit_slope, fit_int)
-  writeDictionary(raw_data, abs_blk, fit_slope, fit_int)
+  writeDictionary(raw_data, dilution_data, abs_blk, fit_slope, fit_int)
   all_data = calcData(raw_data, abs_blk, fit_slope, fit_int)
   data_out = formatOutput(all_data)
   writeFile(file, data_out)
