@@ -44,12 +44,6 @@ def loadFiles(file):
   return plate_data, plate_format
 
 
-
-def writeFile(file, data_out):
-  with open(file + '.out', 'w') as f:
-    for line in data_out:
-      f.write("\t".join(line) + "\n")
-
 def writeFitData(file, conc_std, abs_std, fit_slope, fit_int):
   with open(file + '.fit', 'w') as f:
 
@@ -70,7 +64,7 @@ def checkBlank(raw_blk, tolerance=1):
   return abs_blk
 
 
-def fitStandards(raw_std, abs_blk, omit_lower, omit_upper, omit_outlier=False):
+def fitStandards(raw_std, abs_blk, omit_lower, omit_upper, omit_outlier=False, write_data=True, plot_data=False):
   # Pass in raw standard data and averaged blk values from checkBlank()
   # [FUTURE FEATURE] omit_outlier gives option to find outliers (will need to define) and omit from fitting
   # Average all abs_in data
@@ -86,6 +80,11 @@ def fitStandards(raw_std, abs_blk, omit_lower, omit_upper, omit_outlier=False):
 
   # Adding in finding outliers will be tricky, this might require user input or something more advanced
   [fit_slope, fit_int] = np.polyfit(abs_std[omit_lower:len(abs_std)-omit_upper], conc_std[omit_lower:len(abs_std)-omit_upper], 1)
+
+  if write_data:
+    writeFitData(file, conc_std, abs_std, fit_slope, fit_int)
+  if plot_data:
+    plotting(abs_std, conc_std, fit_slope, fit_int)
 
   return float(fit_slope), float(fit_int), conc_std, abs_std
 
@@ -184,18 +183,18 @@ def formatOutput(json_data, write_data=True):
   row_output = len(all_data[max(all_data, key=lambda k: len(all_data[k][0]))][0])
   data_out = [[] for x in range(row_output+1)]
   #print(row_output, data_out)
-  col_labels = ["day_", "abs_", "abs_sd_", "conc_"]
+  col_labels = ["day_", "abs_", "abs_sd_", "conc_", "dil_"]
   device_list = [x for x in raw_data.keys()]
   device_list.sort()
   for device in device_list:
-    data_out[0].extend([col_labels[x] + device for x in range(4)])
+    data_out[0].extend([col_labels[x] + device for x in range(5)])
 
   for x in range(row_output):
     for device in device_list:
       if (x >= len(all_data[device][0])):
-        data_out[x+1].extend("" for x in range(4))
+        data_out[x+1].extend("" for x in range(5))
         continue
-      data_out[x+1].extend(str(all_data[device][y][x]) for y in range(4))
+      data_out[x+1].extend(str(all_data[device][y][x]) for y in range(5))
 
   if write_data:
     with open(file + '.out', 'w') as f:
@@ -203,24 +202,6 @@ def formatOutput(json_data, write_data=True):
         f.write("\t".join(line) + "\n")
 
   return data_out
-
-def calcData(raw_data, abs_blk, fit_slope, fit_int):
-  # Probably a better way to sort this
-  all_data = {}
-  for device_key in raw_data:
-    time_in=[]; abs_in=[]; abs_sd_in=[]
-    for time_key in raw_data[device_key]:
-      time_in.append(time_key)
-      abs_in.append(np.mean(raw_data[device_key][time_key] - abs_blk))
-      abs_sd_in.append(np.std(raw_data[device_key][time_key] - abs_blk))
-    sorted_list = np.argsort(time_in)
-    abs_in = [abs_in[x] for x in sorted_list]
-    abs_in_sd = [abs_sd_in[x] for x in sorted_list]
-    time_in = [time_in[x] for x in sorted_list]
-    dilution_in = dilution_data[device_key][time_key]
-    conc_in = [(fit_slope * x + fit_int) * dilution_data[device_key][time_key] for x in abs_in]
-    all_data[device_key] = [time_in, abs_in, abs_in_sd, conc_in, dilution_in]
-  return all_data
 
 def plotting(abs_std, conc_std, fit_slope, fit_int):
   import matplotlib.pyplot as plt
@@ -246,40 +227,15 @@ def writeDictionary(raw_data, dilution_data, abs_blk, fit_slope, fit_int):
 
   return json_data
 
-def sortData(json_data):
-  all_data = {}
-  print(json_data)
-  for device_key in json_data:
-#    print(json_data[device_key])
-#    print(len(json_data[device_key]), len(json_data[device_key][0]))
-    time_in=[]; abs_in=[]; abs_sd_in=[]; conc_in=[]; dilution_in=[]
-    for x in range(len(json_data[device_key])):
-      time_in.append(json_data[device_key][x][0])
-      abs_in.append(json_data[device_key][x][1])
-      abs_sd_in.append(json_data[device_key][x][2])
-      conc_in.append(json_data[device_key][x][3])
-      dilution_in.append(json_data[device_key][x][4])
-
-    sorted_list = np.argsort(time_in)
-    abs_in = [abs_in[x] for x in sorted_list]
-    abs_in_sd = [abs_sd_in[x] for x in sorted_list]
-    dilution_in = [dilution_in[x] for x in sorted_list]
-    conc_in = [conc_in[x] for x in sorted_list]
-    time_in = [time_in[x] for x in sorted_list]
-    all_data[device_key] = [time_in, abs_in, abs_in_sd, conc_in, dilution_in]
-  return all_data
-
 ###################
 loadSettings()
 
 for file in file_list:
   plate_data, plate_format = loadFiles(file)
   raw_blk, raw_std, raw_data, dilution_data = processData(plate_data, plate_format)
-  #print(raw_data, dilution_data)
   abs_blk = checkBlank(raw_blk)
   [fit_slope, fit_int, conc_std, abs_std] = fitStandards(raw_std, abs_blk, omit_lower, omit_upper)
-  writeFitData(file, conc_std, abs_std, fit_slope, fit_int)
   json_data = writeDictionary(raw_data, dilution_data, abs_blk, fit_slope, fit_int)
-  data_out = formatOutput(json_data)
-#  writeFile(file, data_out)
+  formatOutput(json_data)
+
   
