@@ -20,10 +20,16 @@ parser = argparse.ArgumentParser(
          ''')
 #to implement later
 parser.add_argument('-i', metavar='file1 file2 ...', nargs='?', help='Input files to process (overrides default/settings file list)')
-parser.add_argument('-o', help='Output data in table format')
-parser.add_argument('-s', metavar='file', default='settings.yml', help='File to use in place of settings.yml')
-parser.add_argument('--omit-lower', nargs='?', default=0, help='Number of high concentration data points to omit from fit')
-parser.add_argument('--omit-upper', metavar='#', nargs='?', default=1, help='Number of low concentration data points to omit from fit')
+# will need to change this default
+parser.add_argument('-o', nargs='?', metavar='file', help='Output data in table format (normally generated from json files with combine.py)')
+parser.add_argument('-s', nargs=1, metavar='file', default='settings.yml', help='File to use in place of settings.yml')
+parser.add_argument('--omit-lower', nargs=1, metavar='#', default=0, help='Number of high concentration data points to omit from fit')
+parser.add_argument('--omit-upper', nargs=1, metavar='#', default=1, help='Number of low concentration data points to omit from fit')
+parser.add_argument('--no-fit', nargs=None, metavar='', help='Do not generate standard curve output file')
+parser.add_argument('--no-logs', nargs=None, metavar='', help='Do not generate logs')
+parser.add_argument('-v, --verbose', nargs=None, metavar='', help='Provide verbose output')
+parser.add_argument('-c, --combine', metavar='file', nargs='?', default='files.list', help='Combine data over multiple plates into single tab delimited table')
+
 
 cli_input = vars(parser.parse_args())
 
@@ -257,7 +263,8 @@ def generateLog():
     f.write("  R^2 = %0.5f\n" % fit_results.rvalue**2)    
     f.write("  %1d data points excluded from lower end\n" % omit_lower)
     f.write("  %1d data points excluded from upper end\n" % omit_upper)
-
+    f.write("\n----- Data Generated ----\n")
+    ## Generate table with Device names, and number of points, maybe actual days
     # any additional logging of value here
 
 ###################
