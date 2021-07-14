@@ -1,14 +1,34 @@
 #!/usr/bin/env python3
 import numpy as np
+import scipy.stats
 import os
 import re
 import json
 import yaml
-# import argparse ## https://docs.python.org/3/library/argparse.html
+import argparse ## https://docs.python.org/3/library/argparse.html
+import time
 
 DEBUG=False
+# latest github version tag
+CURRENT_VERSION=1.1
 
-def loadSettings():
+parser = argparse.ArgumentParser(
+         prog="automate.py",
+         description='''
+         Automated processing of SpectraMax .txt data files.
+         By default, outputs standard curve fit, json formatted data, and log. 
+         ''')
+#to implement later
+parser.add_argument('-i', metavar='file1 file2 ...', nargs='?', help='Input files to process (overrides default/settings file list)')
+parser.add_argument('-o', help='Output data in table format')
+parser.add_argument('-s', metavar='file', default='settings.yml', help='File to use in place of settings.yml')
+parser.add_argument('--omit-lower', nargs='?', default=0, help='Number of high concentration data points to omit from fit')
+parser.add_argument('--omit-upper', metavar='#', nargs='?', default=1, help='Number of low concentration data points to omit from fit')
+
+cli_input = vars(parser.parse_args())
+
+
+def loadSettings(settings_file="settings.yml"):
   # Default settings provided here; settings.yml is loaded, for all variables loaded that appear in default settings will be loaded as global variables.
   default_settings = {
                       'delimiter': '\t', 
@@ -17,7 +37,7 @@ def loadSettings():
                       'file_list': [name[:-4] for name in os.listdir() if name[-3:]=='txt' and name[:-3]+'spec' in os.listdir()]
                       }
   try:
-    yaml_in = yaml.load(open("settings.yml"), Loader=yaml.Loader)
+    yaml_in = yaml.load(open(settings_file), Loader=yaml.Loader)
   except:
     yaml_in = default_settings
 
@@ -79,14 +99,14 @@ def fitStandards(raw_std, abs_blk, omit_lower, omit_upper, omit_outlier=False, w
   conc_std = [conc_std[x] for x in sorted_list]
 
   # Adding in finding outliers will be tricky, this might require user input or something more advanced
-  [fit_slope, fit_int] = np.polyfit(abs_std[omit_lower:len(abs_std)-omit_upper], conc_std[omit_lower:len(abs_std)-omit_upper], 1)
+  fit_results = scipy.stats.linregress(abs_std[omit_lower:len(abs_std)-omit_upper], conc_std[omit_lower:len(abs_std)-omit_upper])
 
   if write_data:
-    writeFitData(file, conc_std, abs_std, fit_slope, fit_int)
+    writeFitData(file, conc_std, abs_std, fit_results.slope, fit_results.intercept)
   if plot_data:
-    plotting(abs_std, conc_std, fit_slope, fit_int)
+    plotting(abs_std, conc_std, fit_results.slope, fit_results.intercept)
 
-  return float(fit_slope), float(fit_int), conc_std, abs_std
+  return fit_results, conc_std, abs_std
 
 def processData(plate_data, plate_format):
   loc_blk = []
@@ -207,7 +227,7 @@ def plotting(abs_std, conc_std, fit_slope, fit_int):
   _ = plt.legend()
   plt.show()
 
-def writeDictionary(raw_data, dilution_data, abs_blk, fit_slope, fit_int):
+def writeDictionary(raw_data, dilution_data, abs_blk, fit_results):
   # This is quick and dirty to enable combine.py processing. Can improve elegance here later.
   json_data = {}
   for device_key in raw_data:
@@ -217,12 +237,28 @@ def writeDictionary(raw_data, dilution_data, abs_blk, fit_slope, fit_int):
       abs_in = np.mean(raw_data[device_key][time_key] - abs_blk)
       abs_sd_in = np.std(raw_data[device_key][time_key] - abs_blk)
       dilution_in = dilution_data[device_key][time_key]
-      conc_in = (fit_slope * abs_in + fit_int) * dilution_data[device_key][time_key]
+      conc_in = (fit_results.slope * abs_in + fit_results.intercept) * dilution_data[device_key][time_key]
       json_data[device_key].append([time_in, abs_in, abs_sd_in, conc_in, dilution_in])
   with open(file + '.dict', 'w') as f:
     json.dump(json_data, f)
 
   return json_data
+
+def generateLog():
+
+
+  with open(file + '.log', 'w') as f:
+    #date
+    #script version
+    #fit r^2
+    f.write("############ automate.py v" + str(CURRENT_VERSION) + " #############\n")
+    f.write("Calculations completed " + time.strftime("%d %b %Y %H:%M:%S", time.localtime()) + "\n")
+    f.write("\n----- Standard Curve Linear Regression ----\n")
+    f.write("  R^2 = %0.5f\n" % fit_results.rvalue**2)    
+    f.write("  %1d data points excluded from lower end\n" % omit_lower)
+    f.write("  %1d data points excluded from upper end\n" % omit_upper)
+
+    # any additional logging of value here
 
 ###################
 loadSettings()
@@ -231,8 +267,8 @@ for file in file_list:
   plate_data, plate_format = loadFiles(file)
   raw_blk, raw_std, raw_data, dilution_data = processData(plate_data, plate_format)
   abs_blk = checkBlank(raw_blk)
-  [fit_slope, fit_int, conc_std, abs_std] = fitStandards(raw_std, abs_blk, omit_lower, omit_upper)
-  json_data = writeDictionary(raw_data, dilution_data, abs_blk, fit_slope, fit_int)
+  [fit_results, conc_std, abs_std] = fitStandards(raw_std, abs_blk, omit_lower, omit_upper)
+  json_data = writeDictionary(raw_data, dilution_data, abs_blk, fit_results)
   formatOutput(json_data)
-
+  generateLog()
   
