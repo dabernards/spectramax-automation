@@ -15,6 +15,7 @@ CURRENT_VERSION=1.1
 parser = argparse.ArgumentParser(
          prog="automate.py",
          description='''
+         !!!!!!!!!!!!!!!!! CLI Parameters not implemented !!!!!!!!!!!!!!!
          Automated processing of SpectraMax .txt data files.
          By default, outputs standard curve fit, json formatted data, and log. 
          ''')
