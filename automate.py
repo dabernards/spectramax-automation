@@ -40,7 +40,7 @@ def loadSettings(settings_file="settings.yml"):
   default_settings = {
                       'delimiter': '\t', 
                       'omit_lower': 0, 'omit_upper': 1, 
-                      'elution_volume': 0.5, 'std_units': "[\u03bcg/ml]",
+                      'elution_volume': 0.5, 'std_units': "\u03bcg/ml",
                       'file_list': [name[:-4] for name in os.listdir() if name[-3:]=='txt' and name[:-3]+'spec' in os.listdir()]
                       }
   try:
@@ -265,12 +265,13 @@ def generateLog():
     f.write("  %1d data points excluded from lower end\n" % omit_lower)
     f.write("  %1d data points excluded from upper end\n" % omit_upper)
     f.write("\n----- Data Generated ----\n")
+    f.write("Units are ["+ std_units + "]")    
     ## Generate table with Device names, and number of points, maybe actual days
     # any additional logging of value here
 
 ###################
 loadSettings()
-
+print(std_units)
 for file in file_list:
   plate_data, plate_format = loadFiles(file)
   raw_blk, raw_std, raw_data, dilution_data = processData(plate_data, plate_format)

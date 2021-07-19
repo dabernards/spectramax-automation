@@ -1,0 +1,26 @@
+#
+# Below list available settings that can be specifed in settings.yml
+# Default values are listed below; to modify the value uncomment (delete leading '#')
+# the line and edit
+#
+# Standard Curve -- when calculating standard curve, omit points on upper/lower end
+# to improve fit quality. Defaults selected for \u03bcBCA where highest concentration
+# absorbance typically deviates from linearity.
+#omit_lower: 0
+#omit_upper: 1
+#
+# When parsing .spec files, the delimiter defaults to tab but can be selected based 
+# on preference.
+#delimiter: "\t"
+
+#
+# Elution volume and units for the standard are not currently used, but are included 
+# here for future features.
+#elution_volume: 0.5
+#std_units: "\u03bcg/ml"
+#
+# By default, all .txt and .spec pairs will be processed. If a subset of files is
+# preferred, they can be listed here.
+#file_list:
+#  - "file1"
+#  - "file2"
