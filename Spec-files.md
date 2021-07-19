@@ -26,11 +26,16 @@ From this list, it will parse out several different sample types/properties:
 
 ## Blank Wells
 
-Blank or background wells are defined by 'blk' and by definition do not have associated *properties*. Values are collected, averaged, and the average is subtracted from all standards to calculate the standard curve and from sample wells to determine sample concentrations. The average and standard deviation of blank wells is reported in the *log* file.[^a future feature will attempt to identify outliers and optionally remove them from the background wells]
+Blank or background wells are defined by 'blk' and by definition do not have associated *properties*. Values are collected, averaged, and the average is subtracted from all standards to calculate the standard curve and from sample wells to determine sample concentrations. The average and standard deviation of blank wells is reported in the *log* file.[^1]
+
+[^1]: a future feature will attempt to identify outliers and optionally remove them from the background wells
 
 ## Standards
 
-Standard wells are defined by 'std' and are specified with a single numerical *property*, which is the associated concentration for the standard curve. Decimal numbers are ok, but if text is passed in the properties an error will occur. Since it makes subsequent plotting or other analysis more complicated, units to do not transfer to calculated data files. Units for the standard curve default to *ug/ml* or can specified in the *settings.yml* file, which will be recorded in the *log* file for each data set. Curve is fit with a linear regression, where data points at the top or bottom end of the standard curve can be omitted if they are known to be outliers.[^a future feature will provide the option of showing a plot of the standard curve to confirm fit quality] Data points omitted are noted in the *log* file along with the R^2 for the fit.[^a future feature should include the absorbance and concentration range for the standard curve in the log]
+Standard wells are defined by 'std' and are specified with a single numerical *property*, which is the associated concentration for the standard curve. Decimal numbers are ok, but if text is passed in the properties an error will occur. Since it makes subsequent plotting or other analysis more complicated, units to do not transfer to calculated data files. Units for the standard curve default to *ug/ml* or can specified in the *settings.yml* file, which will be recorded in the *log* file for each data set. Curve is fit with a linear regression, where data points at the top or bottom end of the standard curve can be omitted if they are known to be outliers.[^2] Data points omitted are noted in the *log* file along with the R^2 for the fit.[^3]
+
+[^2]: a future feature will provide the option of showing a plot of the standard curve to confirm fit quality
+[^3]: a future feature should include the absorbance and concentration range for the standard curve in the log
 
 ## Sample Data
 

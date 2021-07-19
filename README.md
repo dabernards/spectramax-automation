@@ -6,10 +6,12 @@ This set of python code is used to quickly process SpectraMax txt data files. It
 
 Code was developed using Python 3.8, so your mileage may vary if using an earlier Python version. Ensure the following are installed:
 
-- python3 (3.8 or greater ideally)
-installation information can be found at [python.org](https://www.python.org/downloads/)
-- python packages numpy, scipy, pyyaml[^pip is installed in python 3.4 or greater (check at command line with 'python3 -m pip --version')]
-install packages using 'python3 pip3 install numpy scipy pyyaml'
+- python3 (3.8 or greater ideally). 
+Installation information can be found at [python.org](https://www.python.org/downloads/)
+- python packages numpy, scipy, pyyaml[^1].
+Install packages using `python3 pip3 install numpy scipy pyyaml`
+
+[^1]: pip is installed in python 3.4 or greater (check at command line with 'python3 -m pip --version')
 
 ## Data Processing Flow
 1. Find pairs of .txt and .spec files in current directory -- these will be processed
