@@ -14,6 +14,7 @@ std-2	Sample4-nC_x10	Sample4-nA	Sample4-nB_x10	blk
 For each entry in the *.spec* file, there are two parts referred to as *ID* and *properties* (except for in *blk* and *jnk* entries), which are separated by a dash as in *ID-properties*. 
 
 From this list, it will parse out several different sample types/properties:
+
 - Blank Wells (blk)
 - Standards (std)
 - Time-based samples
@@ -34,12 +35,15 @@ Standard wells are defined by 'std' and are specified with a single numerical *p
 Sample wells are defined by an arbitrary 'samplename' and a number of possible 'samplesproperties' are described below. Extensive testing has not been performed on restrictions for samples name, but general text should work fine. For *sampleproperties* the following are currently implemented.
 
 - **d#** -- date
+
 Date in a time sequence, where the '#' is the number of the day (can be decimal).
 
 - **x#** -- dilution
+
 Often samples will be diluted to accurately assay. To automatically adjust calculated concentrations by a dilution factor, this is included with an **x** *property*. The **x** *property* is followed by a numerical value (can be decimal) that the calculated concentration is multiplied by prior to generating the data table. For example, *Sample1-d1_x10* will associate that well with *Sample1* at *day 1* and will adjust the concentration by a factor of 10.
 
 - **n\*** -- sub-name
+
 Non-time sequenced name. If you are not assaying a time sequence, you may want to have samples with a common grouping with sub-samples. Because each *samplename* will generate its own column of data, using this *sub-name* parameter will group this data set in a single column with each *sub-name* occupying one row. At present, the *sub-name* property is ignored if the *date* property is used.
 *eg.* when trying to find an appropriate dilution that falls with the standard curve, you may have samples *A*, *B*, *C* with different dilutions -- if a sub-name is not specified, all dilutions would be averaged back together to generate a single concentration.
 
