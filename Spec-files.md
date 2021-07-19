@@ -1,11 +1,13 @@
 # Specification Files (*.spec*)
 
 Specification files are used to define how the raw data in Spectramax *.txt* files is treated. By default these are tab-delimited files, where each entry begins with a sample/device ID followed by additional detail separated by a dash (*-*). For example:
-'''
-std-10	Sample1-d1	Sample1-d1	Sample1-d3	Sample1-d3
-std-5	Sample2-d1	Sample2-d3	jnk	blk
+
+```
+std-10	Sample1-d1		Sample1-d1	Sample1-d3		Sample1-d3
+std-5	Sample2-d1		Sample2-d3	jnk				blk
 std-2	Sample4-nC_x10	Sample4-nA	Sample4-nB_x10	blk
-'''
+```
+
 
 **Note**: Both dash (-) and underscore (\_) are special characters in the *.spec* file. They are used in specific ways described below.
 
