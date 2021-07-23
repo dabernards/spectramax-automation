@@ -139,7 +139,6 @@ def processData(plate_data, plate_format):
       # all other items are considered data and go into loc_data
       else:
         data_dilution = 1
-        data_time = -1
         [data_name, params] = plate_format[row][col].split('-')
         data_name = data_name.strip()
         for item in params.split('_'):
@@ -148,11 +147,10 @@ def processData(plate_data, plate_format):
           elif item[0]=="x":
             data_dilution=float(item[1:].strip())
           elif item[0]=="n":
-            data_name=item[1:].strip()
+            data_time=item[1:].strip()
           else: pass #for now we just use these two parameters
         if data_name not in loc_data:
           loc_data[data_name] = {}
-        if data_time==-1: data_time=data_name
         if data_time not in loc_data[data_name]:
           loc_data[data_name][data_time] = []
         loc_data[data_name][data_time].append((row, col, data_dilution))
