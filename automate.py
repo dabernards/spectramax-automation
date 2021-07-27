@@ -7,11 +7,13 @@ import json
 import yaml
 import argparse ## https://docs.python.org/3/library/argparse.html
 import time
+import matplotlib.pyplot as plt
 
 DEBUG=False
 # latest github version tag
 CURRENT_VERSION=1.1
 
+VERBOSE_LOGS=True
 parser = argparse.ArgumentParser(
          prog="automate.py",
          description='''
@@ -20,22 +22,25 @@ parser = argparse.ArgumentParser(
          By default, outputs standard curve fit, json formatted data, and log. 
          ''')
 #to implement later
-parser.add_argument('-i', metavar='file1 file2 ...', nargs='?', help='Input files to process (overrides default/settings file list)')
+parser.add_argument('-i', '--input', metavar='file1 file2 ...', nargs='?', help='Input files to process (overrides default/settings file list)')
+parser.add_argument('-f', '--file-list', metavar='file', help='List of files to process')
 # will need to change this default
-parser.add_argument('-o', nargs='?', metavar='file', help='Output data in table format (normally generated from json files with combine.py)')
-parser.add_argument('-s', nargs=1, metavar='file', default='settings.yml', help='File to use in place of settings.yml')
+parser.add_argument('-o', '--output', nargs='?', metavar='file', help='Output data in table format (normally generated from json files with combine.py)')
+parser.add_argument('-s', '--settings', nargs=1, metavar='file', default='settings.yml', help='File to use in place of settings.yml')
 parser.add_argument('--omit-lower', nargs=1, metavar='#', default=0, help='Number of high concentration data points to omit from fit')
 parser.add_argument('--omit-upper', nargs=1, metavar='#', default=1, help='Number of low concentration data points to omit from fit')
-parser.add_argument('--no-fit', nargs=None, metavar='', help='Do not generate standard curve output file')
-parser.add_argument('--no-logs', nargs=None, metavar='', help='Do not generate logs')
-parser.add_argument('-v, --verbose', nargs=None, metavar='', help='Provide verbose output')
-parser.add_argument('-c, --combine', metavar='file', nargs='?', default='files.list', help='Combine data over multiple plates into single tab delimited table')
+parser.add_argument('--no-fit', action='store_true', help='Do not generate standard curve output file')
+parser.add_argument('--no-logs', action='store_true', help='Do not generate logs')
+parser.add_argument('-v', '--verbose', action='store_true', help='Provide verbose output and logs')
+parser.add_argument('-c', '--combine', action='store_true', help='Combine all data into a single output file')
+parser.add_argument('-p', '--plot', action='store_true', help='Show plot of standard curve')
+parser.add_argument('--html', action='store_true', help='Output list of files in HTML format')
 
 
 cli_input = vars(parser.parse_args())
+if DEBUG: print(cli_input)
 
-
-def loadSettings(settings_file="settings.yml"):
+def loadSettings(settings_file):
   # Default settings provided here; settings.yml is loaded, for all variables loaded that appear in default settings will be loaded as global variables.
   default_settings = {
                       'delimiter': '\t', 
@@ -45,9 +50,14 @@ def loadSettings(settings_file="settings.yml"):
                       }
   try:
     yaml_in = yaml.load(open(settings_file), Loader=yaml.Loader)
+    if yaml_in == None: raise Exception()
   except:
     yaml_in = default_settings
-
+  try:
+    with open(cli_input['file_list'], 'r') as f:
+      yaml_in['file_list'] = [line.strip() for line in f if line.strip()!='']
+  except: pass
+ 
   for var in default_settings.keys():
     if var in yaml_in:
       globals()[var] = yaml_in[var]
@@ -108,10 +118,14 @@ def fitStandards(raw_std, abs_blk, omit_lower, omit_upper, omit_outlier=False, w
   # Adding in finding outliers will be tricky, this might require user input or something more advanced
   fit_results = scipy.stats.linregress(abs_std[omit_lower:len(abs_std)-omit_upper], conc_std[omit_lower:len(abs_std)-omit_upper])
 
-  if write_data:
+  if cli_input['no_fit']:
     writeFitData(file, conc_std, abs_std, fit_results.slope, fit_results.intercept)
-  if plot_data:
-    plotting(abs_std, conc_std, fit_results.slope, fit_results.intercept)
+  if cli_input['plot']:
+    _ = plt.plot(abs_std, conc_std, 'o', label='Original data', markersize=10)
+    _ = plt.plot(abs_std, [fit_results.slope * x + fit_results.intercept for x in abs_std], 'r', label='Fitted line')
+    _ = plt.legend()
+    plt.show()
+
 
   return fit_results, conc_std, abs_std
 
@@ -200,7 +214,6 @@ def formatOutput(json_data, write_data=True):
     time_in = [time_in[x] for x in sorted_list]
     all_data[device_key] = [time_in, abs_in, abs_in_sd, conc_in, dilution_in]
 
-
   # Gives element of all_data with max size
   row_output = len(all_data[max(all_data, key=lambda k: len(all_data[k][0]))][0])
   data_out = [[] for x in range(row_output+1)]
@@ -224,13 +237,6 @@ def formatOutput(json_data, write_data=True):
         f.write("\t".join(line) + "\n")
 
   return data_out
-
-def plotting(abs_std, conc_std, fit_slope, fit_int):
-  import matplotlib.pyplot as plt
-  _ = plt.plot(abs_std, conc_std, 'o', label='Original data', markersize=10)
-  _ = plt.plot(abs_std, [fit_slope * x + fit_int for x in abs_std], 'r', label='Fitted line')
-  _ = plt.legend()
-  plt.show()
 
 def writeDictionary(raw_data, dilution_data, abs_blk, fit_results):
   # This is quick and dirty to enable combine.py processing. Can improve elegance here later.
@@ -262,20 +268,74 @@ def generateLog():
     f.write("  R^2 = %0.5f\n" % fit_results.rvalue**2)    
     f.write("  %1d data points excluded from lower end\n" % omit_lower)
     f.write("  %1d data points excluded from upper end\n" % omit_upper)
-    f.write("\n----- Data Generated ----\n")
-    f.write("Units are ["+ std_units + "]")    
+    f.write("\n  Units are ["+ std_units + "]\n\n")    
+
+
     ## Generate table with Device names, and number of points, maybe actual days
     # any additional logging of value here
+    
+    if cli_input['verbose']:
+      f.write("############### Data Check ################\n")
+      f.write("The following are within 20% of the lower\nend of the standard curve:\n\n")
+      for device in bad_data:
+        f.write("  " + device + " at data points " + ", ".join(bad_data[device]) + "\n")
 
+def htmlOutput():
+  short_date = os.getcwd().split('/').pop(-1).split(' ').pop(0)
+  year = '20' + short_date[0:2]
+  month = short_date[2:4]
+
+  output = []
+  for file in os.listdir():
+    if file.split('.').pop(-1) != 'xlsx':
+      output.append('<a href="/wp-content/uploads/20'+short_date[0:2]+'/'+short_date[2:4]+'/'+file+'">'+file.split('.').pop(-1)+'</a>')
+    else:
+      output.append('<a href="/wp-content/uploads/20'+short_date[0:2]+'/'+short_date[2:4]+'/'+file+'">excel</a>')
+
+  print('(' + ', '.join(output)+')')
+
+def dataQC(json_data):
+  bad_data = {}
+  for device in json_data.keys():
+    for item in json_data[device]:
+      if item[1]<=1.2*abs_std[0]:
+        if device not in bad_data:
+          bad_data[device] = []
+        bad_data[device].append(str(item[0]))
+  return bad_data
+
+def verbose_output():
+  print("\n################### Data Check ####################")
+  print("The following are within 20% of the lower end of the standard curve:\n")
+  for device in bad_data:
+    print(device + " at data points " + ", ".join(bad_data[device]))
+  print()
 ###################
-loadSettings()
-print(std_units)
+loadSettings(cli_input['settings'])
+multi_data = {}
+
 for file in file_list:
   plate_data, plate_format = loadFiles(file)
   raw_blk, raw_std, raw_data, dilution_data = processData(plate_data, plate_format)
   abs_blk = checkBlank(raw_blk)
   [fit_results, conc_std, abs_std] = fitStandards(raw_std, abs_blk, omit_lower, omit_upper)
-  json_data = writeDictionary(raw_data, dilution_data, abs_blk, fit_results)
-  formatOutput(json_data)
-  generateLog()
-  
+  file_data = writeDictionary(raw_data, dilution_data, abs_blk, fit_results)
+
+  if cli_input['combine']:
+    for key in file_data:
+      if key not in multi_data:
+        multi_data[key] = []
+      multi_data[key].extend(file_data[key])
+    
+  bad_data = dataQC(file_data)
+  formatOutput(file_data)
+  if cli_input['verbose'] and bad_data!={}: verbose_output()
+  if not cli_input['no_logs']: generateLog()
+  if cli_input['html']: htmlOutput()
+
+if cli_input['combine']:
+  for key in multi_data:
+    multi_data[key].sort()
+  file = "all_data"
+  formatOutput(multi_data)
+    
