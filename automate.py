@@ -31,10 +31,11 @@ parser.add_argument('--omit-lower', nargs=1, metavar='#', default=0, help='Numbe
 parser.add_argument('--omit-upper', nargs=1, metavar='#', default=1, help='Number of low concentration data points to omit from fit')
 parser.add_argument('--no-fit', action='store_true', help='Do not generate standard curve output file')
 parser.add_argument('--no-logs', action='store_true', help='Do not generate logs')
-parser.add_argument('-v', '--verbose', action='store_true', help='Provide verbose output and logs')
+parser.add_argument('-v', '--verbose', action='count', help='Provide verbose output and logs')
 parser.add_argument('-c', '--combine', action='store_true', help='Combine all data into a single output file')
 parser.add_argument('-p', '--plot', action='store_true', help='Show plot of standard curve')
 parser.add_argument('--html', action='store_true', help='Output list of files in HTML format')
+parser.add_argument('--generate-settings', action='store_true', help='Generate a generic settings.yml file')
 
 
 cli_input = vars(parser.parse_args())
@@ -64,6 +65,21 @@ def loadSettings(settings_file):
     else:
       globals()[var] = default_settings[var]
     if DEBUG: print(var, globals()[var])
+
+def generateSettings():
+  default_settings = {
+                      'delimiter': '\t', 
+                      'omit_lower': 0, 'omit_upper': 1, 
+                      'elution_volume': 0.5, 'std_units': "\u03bcg/ml",
+                      'file_list': [name[:-4] for name in os.listdir() if name[-3:]=='txt' and name[:-3]+'spec' in os.listdir()]
+                      }
+  ##should fail if this will overwrite settings
+
+  try:
+    with open('settings.yml', 'x') as f:
+      yaml.dump(default_settings, f)
+  except:
+    print("Settings file already exists in this directory -- settings.yml not generated.")
 
   
 def loadFiles(file):
@@ -310,7 +326,18 @@ def verbose_output():
   for device in bad_data:
     print(device + " at data points " + ", ".join(bad_data[device]))
   print()
+
+
+
+
+
+
 ###################
+if cli_input['generate_settings']:
+  generateSettings()
+  exit()
+
+
 loadSettings(cli_input['settings'])
 multi_data = {}
 
