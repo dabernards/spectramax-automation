@@ -17,7 +17,7 @@ VERBOSE_LOGS=True
 parser = argparse.ArgumentParser(
          prog="automate.py",
          description='''
-         !!!!!!!!!!!!!!!!! CLI Parameters not implemented !!!!!!!!!!!!!!!
+         !!!!!!!!!!!!!!!!! CLI Parameters partially implemented !!!!!!!!!!!!!!!
          Automated processing of SpectraMax .txt data files.
          By default, outputs standard curve fit, json formatted data, and log. 
          ''')
@@ -27,8 +27,8 @@ parser.add_argument('-f', '--file-list', metavar='file', help='List of files to 
 # will need to change this default
 parser.add_argument('-o', '--output', nargs='?', metavar='file', help='Output data in table format (normally generated from json files with combine.py)')
 parser.add_argument('-s', '--settings', nargs=1, metavar='file', default='settings.yml', help='File to use in place of settings.yml')
-parser.add_argument('--omit-lower', nargs=1, metavar='#', default=0, help='Number of high concentration data points to omit from fit')
-parser.add_argument('--omit-upper', nargs=1, metavar='#', default=1, help='Number of low concentration data points to omit from fit')
+parser.add_argument('--omit-lower', metavar='#', help='Number of high concentration data points to omit from fit')
+parser.add_argument('--omit-upper', metavar='#', help='Number of low concentration data points to omit from fit')
 parser.add_argument('--no-fit', action='store_true', help='Do not generate standard curve output file')
 parser.add_argument('--no-logs', action='store_true', help='Do not generate logs')
 parser.add_argument('-v', '--verbose', action='count', help='Provide verbose output and logs')
@@ -36,7 +36,10 @@ parser.add_argument('-c', '--combine', action='store_true', help='Combine all da
 parser.add_argument('-p', '--plot', action='store_true', help='Show plot of standard curve')
 parser.add_argument('--html', action='store_true', help='Output list of files in HTML format')
 parser.add_argument('--generate-settings', action='store_true', help='Generate a generic settings.yml file')
-
+parser.add_argument('--local-settings', action='store_true', help='For each data file, use settings.yml in data directory')
+parser.add_argument('--omit-local', action='store_true', help='Do not generate output files for each file')
+parser.add_argument('--check-lower', metavar='x', type=float, help='In verbose mode, flag data that is within factor of x of lowest standard curve data point')
+parser.add_argument('--check-upper', metavar='x', type=float, help='(not implemented) In verbose mode, flag data that is within factor of x of highest standard curve data point')
 
 cli_input = vars(parser.parse_args())
 if DEBUG: print(cli_input)
@@ -47,6 +50,7 @@ def loadSettings(settings_file):
                       'delimiter': '\t', 
                       'omit_lower': 0, 'omit_upper': 1, 
                       'elution_volume': 0.5, 'std_units': "\u03bcg/ml",
+                      'check_lower': 0.8, 'check_upper': 1.2,
                       'file_list': [name[:-4] for name in os.listdir() if name[-3:]=='txt' and name[:-3]+'spec' in os.listdir()]
                       }
   try:
@@ -59,6 +63,14 @@ def loadSettings(settings_file):
       yaml_in['file_list'] = [line.strip() for line in f if line.strip()!='']
   except: pass
  
+  #CLI inputs take precident, won't be happy if omit_lower or upper is non-int
+  for var in ['omit_lower', 'omit_upper', 'check_lower', 'check_upper']:
+    if cli_input[var] is not None:
+      yaml_in[var] = int(cli_input[var])
+  for var in ['check_lower', 'check_upper']:
+    if cli_input[var] is not None:
+      yaml_in[var] = cli_input[var]
+
   for var in default_settings.keys():
     if var in yaml_in:
       globals()[var] = yaml_in[var]
@@ -71,6 +83,7 @@ def generateSettings():
                       'delimiter': '\t', 
                       'omit_lower': 0, 'omit_upper': 1, 
                       'elution_volume': 0.5, 'std_units': "\u03bcg/ml",
+                      'check_lower': 0.8, 'check_upper': 1.2,
                       'file_list': [name[:-4] for name in os.listdir() if name[-3:]=='txt' and name[:-3]+'spec' in os.listdir()]
                       }
   ##should fail if this will overwrite settings
@@ -94,6 +107,7 @@ def loadFiles(file):
   with open(file + '.spec', errors="ignore", mode="r") as f:
     plate_format = [line.strip().split(delimiter) for line in f if line.strip()!='']
 
+  
   return plate_data, plate_format
 
 
@@ -111,7 +125,10 @@ def writeFitData(file, conc_std, abs_std, fit_slope, fit_int):
 def checkBlank(raw_blk, tolerance=1):
   # FUTURE FEATURE -- can add some checks for outliers in the blanks -- will need to trouble shoot a bit
   # tolerance is how many standard deviations away from the mean should be discarded
-  abs_blk = np.mean(raw_blk)
+  if raw_blk != []:
+    abs_blk = np.mean(raw_blk)
+  else:
+    abs_blk=float(0)
 
 
   return abs_blk
@@ -131,18 +148,19 @@ def fitStandards(raw_std, abs_blk, omit_lower, omit_upper, omit_outlier=False, w
   abs_std_sd = [abs_std[x] for x in sorted_list]
   conc_std = [conc_std[x] for x in sorted_list]
 
+  # Will want to add some fit options here, check out : https://scipy-cookbook.readthedocs.io/items/FittingData.html
   # Adding in finding outliers will be tricky, this might require user input or something more advanced
   fit_results = scipy.stats.linregress(abs_std[omit_lower:len(abs_std)-omit_upper], conc_std[omit_lower:len(abs_std)-omit_upper])
 
-  if cli_input['no_fit']:
+  if not cli_input['no_fit']:
     writeFitData(file, conc_std, abs_std, fit_results.slope, fit_results.intercept)
   if cli_input['plot']:
     _ = plt.plot(abs_std, conc_std, 'o', label='Original data', markersize=10)
     _ = plt.plot(abs_std, [fit_results.slope * x + fit_results.intercept for x in abs_std], 'r', label='Fitted line')
     _ = plt.legend()
+    _ = plt.loglog()
     plt.show()
-
-
+    
   return fit_results, conc_std, abs_std
 
 def processData(plate_data, plate_format):
@@ -186,6 +204,7 @@ def processData(plate_data, plate_format):
         loc_data[data_name][data_time].append((row, col, data_dilution))
 
   raw_blk = [ float(plate_data[row][col]) for [row, col] in loc_blk ]
+
   ## FUTURE FEATURE -- checkBlank -- this should get integrated into checkBlank behavior
 
   # Put standards into raw_std dictionary
@@ -261,8 +280,9 @@ def writeDictionary(raw_data, dilution_data, abs_blk, fit_results):
     json_data[device_key] = []
     for time_key in raw_data[device_key]:
       time_in = time_key
-      abs_in = np.mean(raw_data[device_key][time_key] - abs_blk)
-      abs_sd_in = np.std(raw_data[device_key][time_key] - abs_blk)
+      
+      abs_in = np.mean(raw_data[device_key][time_key]) - abs_blk
+      abs_sd_in = np.std(raw_data[device_key][time_key]) - abs_blk
       dilution_in = dilution_data[device_key][time_key]
       conc_in = (fit_results.slope * abs_in + fit_results.intercept) * dilution_data[device_key][time_key]
       json_data[device_key].append([time_in, abs_in, abs_sd_in, conc_in, dilution_in])
@@ -292,7 +312,7 @@ def generateLog():
     
     if cli_input['verbose']:
       f.write("############### Data Check ################\n")
-      f.write("The following are within 20% of the lower\nend of the standard curve:\n\n")
+      f.write("The following are within %1.2f of the lower\nend of the standard curve:\n\n" % check_lower)
       for device in bad_data:
         f.write("  " + device + " at data points " + ", ".join(bad_data[device]) + "\n")
 
@@ -314,7 +334,7 @@ def dataQC(json_data):
   bad_data = {}
   for device in json_data.keys():
     for item in json_data[device]:
-      if item[1]<=1.2*abs_std[0]:
+      if item[1]<=check_lower*abs_std[0+omit_lower]:
         if device not in bad_data:
           bad_data[device] = []
         bad_data[device].append(str(item[0]))
@@ -322,7 +342,7 @@ def dataQC(json_data):
 
 def verbose_output():
   print("\n################### Data Check ####################")
-  print("The following are within 20% of the lower end of the standard curve:\n")
+  print("The following are within %1.2f of the lower end of the standard curve:\n" % check_lower)
   for device in bad_data:
     print(device + " at data points " + ", ".join(bad_data[device]))
   print()
@@ -337,15 +357,26 @@ if cli_input['generate_settings']:
   generateSettings()
   exit()
 
+if not cli_input['local_settings']:
+  loadSettings(cli_input['settings'])
+else:
+  try:
+    with open(cli_input['file_list'], 'r') as f:
+      file_list = [line.strip() for line in f if line.strip()!='']
+  except: pass
 
-loadSettings(cli_input['settings'])
 multi_data = {}
 
 for file in file_list:
+  if cli_input['local_settings']:
+    loadSettings(os.path.dirname(os.path.realpath(file))+"/settings.yml")
+
   plate_data, plate_format = loadFiles(file)
   raw_blk, raw_std, raw_data, dilution_data = processData(plate_data, plate_format)
+
   abs_blk = checkBlank(raw_blk)
   [fit_results, conc_std, abs_std] = fitStandards(raw_std, abs_blk, omit_lower, omit_upper)
+  print(fit_results, conc_std, abs_std)
   file_data = writeDictionary(raw_data, dilution_data, abs_blk, fit_results)
 
   if cli_input['combine']:
