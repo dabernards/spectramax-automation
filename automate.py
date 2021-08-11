@@ -376,7 +376,6 @@ for file in file_list:
 
   abs_blk = checkBlank(raw_blk)
   [fit_results, conc_std, abs_std] = fitStandards(raw_std, abs_blk, omit_lower, omit_upper)
-  print(fit_results, conc_std, abs_std)
   file_data = writeDictionary(raw_data, dilution_data, abs_blk, fit_results)
 
   if cli_input['combine']:
