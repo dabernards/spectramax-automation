@@ -34,12 +34,14 @@ parser.add_argument('--no-logs', action='store_true', help='Do not generate logs
 parser.add_argument('-v', '--verbose', action='count', help='Provide verbose output and logs')
 parser.add_argument('-c', '--combine', action='store_true', help='Combine all data into a single output file')
 parser.add_argument('-p', '--plot', action='store_true', help='Show plot of standard curve')
+parser.add_argument('-d', '--no-data', action='store_true', help='Only generate standard curve and do not process data')
 parser.add_argument('--html', action='store_true', help='Output list of files in HTML format')
 parser.add_argument('--generate-settings', action='store_true', help='Generate a generic settings.yml file')
 parser.add_argument('--local-settings', action='store_true', help='For each data file, use settings.yml in data directory')
 parser.add_argument('--omit-local', action='store_true', help='Do not generate output files for each file')
 parser.add_argument('--check-lower', metavar='x', type=float, help='In verbose mode, flag data that is within factor of x of lowest standard curve data point')
 parser.add_argument('--check-upper', metavar='x', type=float, help='(not implemented) In verbose mode, flag data that is within factor of x of highest standard curve data point')
+parser.add_argument('--fit-only', action='store_true', help='Do not generate output files for each file')
 
 cli_input = vars(parser.parse_args())
 if DEBUG: print(cli_input)
@@ -106,7 +108,7 @@ def loadFiles(file):
   # Read in comma delimited descriptor file
   with open(file + '.spec', errors="ignore", mode="r") as f:
     plate_format = [line.strip().split(delimiter) for line in f if line.strip()!='']
-
+  # processing error if data doesn't start in column 1
   
   return plate_data, plate_format
 
@@ -211,7 +213,6 @@ def processData(plate_data, plate_format):
   raw_std = {}
   for key in loc_std:
     raw_std[key] = [ float(plate_data[row][col]) for [row,col] in loc_std[key] ]
-
 
   raw_data = {}
   dilution_data = {}
@@ -376,6 +377,8 @@ for file in file_list:
 
   abs_blk = checkBlank(raw_blk)
   [fit_results, conc_std, abs_std] = fitStandards(raw_std, abs_blk, omit_lower, omit_upper)
+  if cli_input['fit_only']: exit()
+
   file_data = writeDictionary(raw_data, dilution_data, abs_blk, fit_results)
 
   if cli_input['combine']:
