@@ -142,7 +142,7 @@ def fitStandards(raw_std, abs_blk, omit_lower, omit_upper, omit_outlier=False, w
   # Average all abs_in data
   conc_std = [key for key in raw_std]
   abs_std = [(np.mean(raw_std[key]) - abs_blk) for key in raw_std]
-  abs_std_sd = [(np.std(raw_std[key]) - abs_blk) for key in raw_std]
+  abs_std_sd = [(np.std(raw_std[key])) for key in raw_std]
 
   # Sort, keyed on conc_std -- probably a cleaner way to do this...
   sorted_list = np.argsort(conc_std)
@@ -283,7 +283,7 @@ def writeDictionary(raw_data, dilution_data, abs_blk, fit_results):
       time_in = time_key
       
       abs_in = np.mean(raw_data[device_key][time_key]) - abs_blk
-      abs_sd_in = np.std(raw_data[device_key][time_key]) - abs_blk
+      abs_sd_in = np.std(raw_data[device_key][time_key])
       dilution_in = dilution_data[device_key][time_key]
       conc_in = (fit_results.slope * abs_in + fit_results.intercept) * dilution_data[device_key][time_key]
       json_data[device_key].append([time_in, abs_in, abs_sd_in, conc_in, dilution_in])
