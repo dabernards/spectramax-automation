@@ -216,13 +216,13 @@ def processData(plate_data, plate_format):
     loc_std = {}
     loc_data = {}
     # Iterate through data in .spec to bucket standards, blanks, and data
-    for row in range(len(plate_format)):
-        for col in range(len(plate_format[row])):
-            data_type = plate_format[row][col][0:3]
+    for row, _ in enumerate(plate_format):
+        for col, plate_item in enumerate(plate_format[row]):
+            data_type = plate_item[0:3]
 
             # blanket failsafe -- if entry is blank or user goes out of the way to enter 'jnk',
             # ignore it.
-            if data_type == "" or data_type == "jnk":
+            if data_type in ("", "jnk"):
                 continue
 
             # blk locations go into loc_blk
@@ -234,14 +234,14 @@ def processData(plate_data, plate_format):
             # just append it to the existing array, otherwise an array with the
             # first entry is required.
             elif data_type == "std":
-                if float(plate_format[row][col][4:]) not in loc_std:
-                    loc_std[float(plate_format[row][col][4:])] = []
-                loc_std[float(plate_format[row][col][4:])].append([row, col])
+                if float(plate_item[4:]) not in loc_std:
+                    loc_std[float(plate_item[4:])] = []
+                loc_std[float(plate_item[4:])].append([row, col])
 
             # all other items are considered data and go into loc_data
             else:
                 data_dilution = 1
-                [data_name, params] = plate_format[row][col].split('-')
+                [data_name, params] = plate_item.split('-')
                 data_name = data_name.strip()
                 for item in params.split('_'):
                     if item[0] == "d":
@@ -295,12 +295,12 @@ def formatOutput(json_data, file, write_data=True):
         abs_sd_in = []
         conc_in = []
         dilution_in = []
-        for x in range(len(json_data[device_key])):
-            time_in.append(json_data[device_key][x][0])
-            abs_in.append(json_data[device_key][x][1])
-            abs_sd_in.append(json_data[device_key][x][2])
-            conc_in.append(json_data[device_key][x][3])
-            dilution_in.append(json_data[device_key][x][4])
+        for i in range(len(json_data[device_key])):
+            time_in.append(json_data[device_key][i][0])
+            abs_in.append(json_data[device_key][i][1])
+            abs_sd_in.append(json_data[device_key][i][2])
+            conc_in.append(json_data[device_key][i][3])
+            dilution_in.append(json_data[device_key][i][4])
 
         sorted_list = np.argsort(time_in)
         abs_in = [abs_in[x] for x in sorted_list]
@@ -320,12 +320,12 @@ def formatOutput(json_data, file, write_data=True):
     for device in device_list:
         data_out[0].extend([col_labels[x] + device for x in range(5)])
 
-    for x in range(row_output):
+    for i in range(row_output):
         for device in device_list:
-            if x >= len(all_data[device][0]):
-                data_out[x+1].extend("" for x in range(5))
+            if i >= len(all_data[device][0]):
+                data_out[i+1].extend("" for i in range(5))
                 continue
-            data_out[x+1].extend(str(all_data[device][y][x]) for y in range(5))
+            data_out[i+1].extend(str(all_data[device][j][i]) for j in range(5))
 
     if write_data:
         with open(file + '.out', 'w') as f:
@@ -379,7 +379,7 @@ def generateLog():
             f.write("The following are within %1.2f of the lower\n\
                 end of the standard curve:\n\n" % check_lower)
             for device in bad_data:
-                f.write("  " + device + " at data points " + ", ".join(bad_data[device]) + "\n")
+                f.write(f"  {device} at data points " + ", ".join(bad_data[device]) + "\n")
 
 def htmlOutput():
     """ generate list of files as html links """
@@ -390,13 +390,10 @@ def htmlOutput():
     output = []
     for file in os.listdir():
         if file.split('.').pop(-1) != 'xlsx':
-            output.append('<a href="/wp-content/uploads/' \
-                + year + '/' + month + '/' + file + '">' \
+            output.append(f'<a href="/wp-content/uploads/{year}/{month}/{file}">' \
                 + file.split('.').pop(-1) + '</a>')
         else:
-            output.append('<a href="/wp-content/uploads/' \
-                + year + '/' + month + '/' + file \
-                + '">excel</a>')
+            output.append(f'<a href="/wp-content/uploads/{year}/{month}/{file}">excel</a>')
     print('(' + ', '.join(output)+')')
 
 def dataQC(json_data):
@@ -415,13 +412,8 @@ def verbose_output():
     print("\n################### Data Check ####################")
     print("The following are within %1.2f of the lower end of the standard curve:\n" % check_lower)
     for device in bad_data:
-        print(device + " at data points " + ", ".join(bad_data[device]))
+        print(f"{device} at data points " + ', '.join(bad_data[device]))
     print()
-
-
-
-
-
 
 ###################
 if cli_input['generate_settings']:
