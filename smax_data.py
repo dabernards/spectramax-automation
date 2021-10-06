@@ -6,10 +6,11 @@ import numpy as np
 import scipy.stats
 import matplotlib.pyplot as plt
 
-class DataSettings:
-    ''' Structure to deal with settings and cli parameters '''
-    def __init__(self):
-        self.settings = {
+def load_settings(settings_file="settings.yml"):
+    ''' Structure to deal with settings and cli parameters
+    Default settings provided here; settings.yml is loaded, for all variables
+    loaded that appear in default settings will be loaded as global variables.'''
+    settings = {
             'delimiter': '\t',
             'omit_lower': 0, 'omit_upper': 1,
             'elution_volume': 0.5, 'std_units': "\u03bcg/ml",
@@ -17,28 +18,18 @@ class DataSettings:
             'file_list': [name[:-4] for name in os.listdir() \
                 if name[-3:] == 'txt' and name[:-3]+'spec' in os.listdir()]
             }
-        self.setting_file = "settings.yml"
-        self.load_settings()
-
-    def load_settings(self):
-        """ Default settings provided here; settings.yml is loaded, for all variables
-        loaded that appear in default settings will be loaded as global variables."""
-        try:
-            with open(self.setting_file, encoding="utf-8") as handle:
-                _yaml_in = yaml.load(handle, Loader=yaml.Loader)
-            if _yaml_in is None:
-                raise NameError('EmptyFile')
-            for item in _yaml_in:
-                self.settings[item] = _yaml_in[item]
-        except NameError:
-            print("Settings file is empty -> default settings used.")
-        except FileNotFoundError:
-            print("Settings file not found -> default settings used.")
-
-    def parse_cli(self):
-        """ placeholder """
-        print(self.settings)
-
+    try:
+        with open(settings_file, encoding="utf-8") as handle:
+            _yaml_in = yaml.load(handle, Loader=yaml.Loader)
+        if _yaml_in is None:
+            raise NameError('EmptyFile')
+        for item in _yaml_in:
+            settings[item] = _yaml_in[item]
+    except NameError:
+        print("Settings file is empty -> default settings used.")
+    except FileNotFoundError:
+        print("Settings file not found -> default settings used.")
+    return settings
 
 class SpectraMaxData:
     ''' SpectraMax plate reader data processing architecture '''
@@ -48,8 +39,8 @@ class SpectraMaxData:
         self.plate_format = self.read_format()
         self.raw_blk, self.abs_blk = self.obtain_blank()
         self.raw_std, self.abs_std = self.obtain_standards()
-        self.omit_upper = 1
-        self.omit_lower = 0
+        self.omit_upper = 1 # from settings eventually
+        self.omit_lower = 0 # from settings eventually
         self.fit_results = self.fit_standards()
 
     def read_data(self):
@@ -136,7 +127,8 @@ class SpectraMaxData:
         conc_std, abs_std = self.sorted_standards()
 
         _ = plt.plot(abs_std, conc_std, 'o', label='Original data', markersize=10)
-        _ = plt.plot(abs_std, [self.fit_results.slope * conc + self.fit_results.intercept for conc in abs_std], \
+        _ = plt.plot(abs_std, \
+            [self.fit_results.slope * conc + self.fit_results.intercept for conc in abs_std], \
             'r', label='Fitted line')
         _ = plt.legend()
         _ = plt.loglog()
