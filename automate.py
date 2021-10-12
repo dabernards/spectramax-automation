@@ -66,7 +66,7 @@ parser.add_argument('--fit-only', action='store_true', \
     help='Do not generate output files for each file')
 
 cli_input = vars(parser.parse_args())
-if DEBUG:
+if True:
     print(cli_input)
 
 def loadSettings(settings_file):
@@ -92,12 +92,12 @@ def loadSettings(settings_file):
         pass
 
   #CLI inputs take precident, won't be happy if omit_lower or upper is non-int
-    for var in ['omit_lower', 'omit_upper', 'check_lower', 'check_upper']:
+    for var in ['omit_lower', 'omit_upper']:
         if cli_input[var] is not None:
             yaml_in[var] = int(cli_input[var])
-#    for var in ['check_lower', 'check_upper']:
-#        if cli_input[var] is not None:
-#            yaml_in[var] = cli_input[var]
+    for var in ['check_lower', 'check_upper']:
+        if cli_input[var] is not None:
+            yaml_in[var] = float(cli_input[var])
 
     for var in default_settings.keys():
         if var in yaml_in:
