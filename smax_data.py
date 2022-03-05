@@ -139,15 +139,12 @@ class SpectraMaxData:
         # Adding in finding outliers will be tricky, this might require user input
         # or something more advanced
 
-        conc_std, abs_std = self.sorted_standards()
+        sorted_list = sorted(zip(self.abs_std.keys(), self.abs_std.values()))
+        conc_std, abs_std = zip(*sorted_list)
 
         fit_results = scipy.stats.linregress(\
             abs_std[self.omit_lower:len(abs_std)-self.omit_upper], \
             conc_std[self.omit_lower:len(abs_std)-self.omit_upper])
-        '''
-        if not cli_input['no_fit']:
-            writeFitData(file, conc_std, abs_std, fit_results.slope, fit_results.intercept)
-        '''
 
         return fit_results
 
@@ -161,16 +158,3 @@ class SpectraMaxData:
 
         return conc_std, abs_std
 
-    def plot_standards(self):
-        '''plot things '''
-
-        conc_std, abs_std = self.sorted_standards()
-
-        _ = plt.plot(abs_std, conc_std, 'o', label='Original data', markersize=10)
-        _ = plt.plot(abs_std, \
-            [self.fit_results.slope * conc + self.fit_results.intercept for conc in abs_std], \
-            'r', label='Fitted line')
-        _ = plt.legend()
-        _ = plt.loglog()
-        plt.show()
-        return True
