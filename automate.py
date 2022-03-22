@@ -251,11 +251,11 @@ def processData(plate_data, plate_format):
                     elif item[0] == "n":
                         data_time = item[1:].strip()
                     else: pass #for now we just use these two parameters
-                    if data_name not in loc_data:
-                        loc_data[data_name] = {}
-                    if data_time not in loc_data[data_name]:
-                        loc_data[data_name][data_time] = []
-                    loc_data[data_name][data_time].append((row, col, data_dilution))
+                if data_name not in loc_data:
+                    loc_data[data_name] = {}
+                if data_time not in loc_data[data_name]:
+                    loc_data[data_name][data_time] = []
+                loc_data[data_name][data_time].append((row, col, data_dilution))
 
     raw_blk = [float(plate_data[row][col]) for [row, col] in loc_blk]
 
@@ -277,6 +277,7 @@ def processData(plate_data, plate_format):
                 for (row, col, dilution) in loc_data[device_key][time_key]]
             dilution_data[device_key][time_key] = \
                 [dilution for (row, col, dilution) in loc_data[device_key][time_key]]
+    print(dilution_data)
   # Inelegant way, just want to flatten dilution data -- risky for unaware users
     for device_key in loc_data:
         for time_key in loc_data[device_key]:
