@@ -1,5 +1,8 @@
 # README.md
 
+Restructuring of the Spectramax automation script is intended to transform the cli tool toward a package-oriented version with a wrapper for quick cli use w/ existing argument structure. In this way it is more amenable for use in a 'data-as-code' methodology where all functions are captured in a single python script.
+
+#### Prior notes
 This set of python code is used to quickly process SpectraMax txt data files. It is primarily designed with time-sequence data where each time point has one or more replicates. A Specification file is used to identify the sample in each well and data is output to a key-value JSON-type dictionary for ease of data aggregation across multiple plates and measurement dates.
 
 ## Dependencies
