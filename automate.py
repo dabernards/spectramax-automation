@@ -66,7 +66,7 @@ parser.add_argument('--fit-only', action='store_true', \
     help='Do not generate output files for each file')
 
 cli_input = vars(parser.parse_args())
-if True:
+if False:
     print(cli_input)
 
 def loadSettings(settings_file):
