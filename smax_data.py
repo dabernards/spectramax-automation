@@ -1,23 +1,65 @@
-''' Overarching description '''
-import os
+''' Basic manipulation tools for SpectraMax Data
+    Currently in a major restructuring to be more amenable to cli and in-script use
+    Better adaptation for use in 'data-as-code' methodology '''
+
+#import os
 import re
 import yaml
 import numpy as np
 import scipy.stats
-import matplotlib.pyplot as plt
+
+
+def load_plate(filename, return_locations=False):
+    ''' Open the .txt file to load the data
+        Spectramax encodes the degree symbol as \ufffd for some reason, which can't be
+        parsed properly, so errors are handled with 'replace'
+        When return_locations is True, function returns 8x12 array with locations where
+        data can be found.
+        Function will return a larger array if txt file contains multiple plates
+    '''
+
+    # Confirms filename ends as .txt file and corrects extension if not
+    if filename[-4:] != '.txt':
+        filename = f"{filename}.txt"
+
+    # Regular expression here matches lines that start w/ two tabs or a tab followed by number
+    try:
+        with open(filename, 'r', encoding='utf-8', errors='replace') as handle:
+            _raw_data = [line.split('\t') for line in handle \
+                if re.match('\t[1-9|\t]', line[0:2]) and line.strip() != '']
+
+        # Plates will always include two leading columns and a tailing new-line character
+        # By default, non-blank data is converted to a float
+        if not return_locations:
+            plate_data = [ y[2:-2] for y in _raw_data ]
+            plate_data = [ [float(x) for x in y if x!=""] for y in plate_data if y!=['']*12 ]
+        else:
+            plate_data = [ [ x!="" for x in y[2:-2] ] for y in _raw_data ]
+
+    except FileNotFoundError:
+        print(f"!!! Could not locate {filename}.txt -- specify a file that exists !!!")
+        plate_data = []
+
+    return plate_data
+
+
+
+
 
 def load_settings(settings_file="settings.yml"):
-    ''' Structure to deal with settings and cli parameters
-    Default settings provided here; settings.yml is loaded, for all variables
-    loaded that appear in default settings will be loaded as global variables.'''
+    ''' Settings to process data can be loaded from file
+        Otherwise default settings are reverted to here
+        Generating a file list should go elsewhere
+            'file_list': [name[:-4] for name in os.listdir() \
+        if name[-3:] == 'txt' and name[:-3]+'spec' in os.listdir()]
+        '''
     settings = {
             'delimiter': '\t',
             'omit_lower': 0, 'omit_upper': 1,
-            'elution_volume': 0.5, 'std_units': "\u03bcg/ml",
             'check_lower': 0.8, 'check_upper': 1.2,
-            'file_list': [name[:-4] for name in os.listdir() \
-                if name[-3:] == 'txt' and name[:-3]+'spec' in os.listdir()]
+            'elution_volume': 0.5, 'std_units': "\u03bcg/ml"
             }
+
     try:
         with open(settings_file, encoding="utf-8") as handle:
             _yaml_in = yaml.load(handle, Loader=yaml.Loader)
@@ -25,15 +67,65 @@ def load_settings(settings_file="settings.yml"):
             raise NameError('EmptyFile')
         for item in _yaml_in:
             settings[item] = _yaml_in[item]
+
     except NameError:
-        print("Settings file is empty -> default settings used.")
+        print(f"!!! No settings in {settings_file} -> default settings used !!!")
     except FileNotFoundError:
-        print("Settings file not found -> default settings used.")
+        print(f"!!! Could not locate {settings_file} -> default settings used !!!")
+
     return settings
 
+def load_spec(filename, delimiter='\t'):
+    ''' Open the .spec file to load specifications for the plate
+        By default, delimiter for these files is a tab
+        Since right/left & top/bottom data will be trimmed from plate_data,
+        .spec should begin with upper left corner of data range.
+    '''
+    with open(filename + '.txt', 'r', encoding='utf-8', errors='replace') as handle:
+        plate_data = [line.strip().split('\t') for line in handle \
+            if re.match('\t[1-9|\t]', line[0:2]) and line.strip() != '']
+    # Temperature does not have use in current implimentation and is dropped here
+    _ = plate_data[0].pop(0)
+
+    # Open the .spec file to load the plate formatting
+    with open(filename + '.spec', encoding='utf-8', errors="ignore", mode="r") as handle:
+        plate_format = [line.strip().split('\t') for line in handle if line.strip() != '']
+
+    data_pairs = [ (name.strip(), float(data)) for name, data in \
+        zip(np.array(plate_format).flatten(),np.array(plate_data).flatten()) ]
+
+    # Raw data should contain blank wells, standards, and raw data
+    raw_data = {'blank': [], 'standard': {}, 'data': {}}
+
+    # Collecting blank wells is easy enough
+    raw_data['blank'] = [ data for name, data in data_pairs if name.startswith('blk')]
+
+    # First collect the standard concentrations the assemble the data
+    std_concs = { name.split('-')[1] for name, data in data_pairs if name.startswith('std') }
+    for conc in std_concs:
+        raw_data['standard'][float(conc)] = \
+            [ data for name, data in data_pairs if name.endswith('-' + conc) ]
+
+    # Generate a set of tuples with samples and timepoints (deduplicate with a set)
+    sample_set = {tuple(name.split('-')) for name, data in data_pairs \
+                            if not name.startswith(('blk', 'std')) }
+    raw_data['data'] = { sample: {} for sample, _ in sample_set}
+    for sample, timepoint in sample_set:
+        raw_data['data'][sample][float(timepoint.lstrip('d'))] = \
+            [ data for name, data in data_pairs \
+            if name.startswith(sample) and name.endswith('d' + timepoint)]
+
+    return raw_data
+
+
+
 def load_rawdata(filename):
-    ''' Open the .txt file to load the data '''
-    with open(filename + '.txt', encoding='utf-8', errors='ignore', mode='r') as handle:
+    ''' Open the .txt file to load the data
+        Spectramax encodes the degree symbol as \ufffd for some reason, which can't be
+        parsed properly, so errors are handled with 'replace'
+
+    '''
+    with open(filename + '.txt', 'r', encoding='utf-8', errors='replace') as handle:
         plate_data = [line.strip().split('\t') for line in handle \
             if re.match('\t[1-9|\t]', line[0:2]) and line.strip() != '']
     # Temperature does not have use in current implimentation and is dropped here
