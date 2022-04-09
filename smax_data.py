@@ -43,9 +43,6 @@ def load_plate(filename, return_locations=False):
     return plate_data
 
 
-
-
-
 def load_settings(settings_file="settings.yml"):
     ''' Settings to process data can be loaded from file
         Otherwise default settings are reverted to here
@@ -75,88 +72,52 @@ def load_settings(settings_file="settings.yml"):
 
     return settings
 
+
 def load_spec(filename, delimiter='\t'):
     ''' Open the .spec file to load specifications for the plate
         By default, delimiter for these files is a tab
         Since right/left & top/bottom data will be trimmed from plate_data,
         .spec should begin with upper left corner of data range.
     '''
-    with open(filename + '.txt', 'r', encoding='utf-8', errors='replace') as handle:
-        plate_data = [line.strip().split('\t') for line in handle \
-            if re.match('\t[1-9|\t]', line[0:2]) and line.strip() != '']
-    # Temperature does not have use in current implimentation and is dropped here
-    _ = plate_data[0].pop(0)
 
     # Open the .spec file to load the plate formatting
-    with open(filename + '.spec', encoding='utf-8', errors="ignore", mode="r") as handle:
+    with open(filename + '.spec', encoding='utf-8', errors="replace", mode="r") as handle:
         plate_format = [line.strip().split('\t') for line in handle if line.strip() != '']
 
-    data_pairs = [ (name.strip(), float(data)) for name, data in \
-        zip(np.array(plate_format).flatten(),np.array(plate_data).flatten()) ]
+    # Should add error checking on format of .spec items
 
-    # Raw data should contain blank wells, standards, and raw data
-    raw_data = {'blank': [], 'standard': {}, 'data': {}}
-
-    # Collecting blank wells is easy enough
-    raw_data['blank'] = [ data for name, data in data_pairs if name.startswith('blk')]
-
-    # First collect the standard concentrations the assemble the data
-    std_concs = { name.split('-')[1] for name, data in data_pairs if name.startswith('std') }
-    for conc in std_concs:
-        raw_data['standard'][float(conc)] = \
-            [ data for name, data in data_pairs if name.endswith('-' + conc) ]
-
-    # Generate a set of tuples with samples and timepoints (deduplicate with a set)
-    sample_set = {tuple(name.split('-')) for name, data in data_pairs \
-                            if not name.startswith(('blk', 'std')) }
-    raw_data['data'] = { sample: {} for sample, _ in sample_set}
-    for sample, timepoint in sample_set:
-        raw_data['data'][sample][float(timepoint.lstrip('d'))] = \
-            [ data for name, data in data_pairs \
-            if name.startswith(sample) and name.endswith('d' + timepoint)]
-
-    return raw_data
+    return plate_format
 
 
 
-def load_rawdata(filename):
-    ''' Open the .txt file to load the data
-        Spectramax encodes the degree symbol as \ufffd for some reason, which can't be
-        parsed properly, so errors are handled with 'replace'
+def load_rawdata(plate_data, plate_format):
+    ''' from plate data and formatting, extract blank, standard, and data
 
     '''
-    with open(filename + '.txt', 'r', encoding='utf-8', errors='replace') as handle:
-        plate_data = [line.strip().split('\t') for line in handle \
-            if re.match('\t[1-9|\t]', line[0:2]) and line.strip() != '']
-    # Temperature does not have use in current implimentation and is dropped here
-    _ = plate_data[0].pop(0)
 
-    # Open the .spec file to load the plate formatting
-    with open(filename + '.spec', encoding='utf-8', errors="ignore", mode="r") as handle:
-        plate_format = [line.strip().split('\t') for line in handle if line.strip() != '']
-
-    data_pairs = [ (name.strip(), float(data)) for name, data in \
+    _data_pairs = [ (name.strip(), float(data)) for name, data in \
         zip(np.array(plate_format).flatten(),np.array(plate_data).flatten()) ]
 
     # Raw data should contain blank wells, standards, and raw data
     raw_data = {'blank': [], 'standard': {}, 'data': {}}
 
     # Collecting blank wells is easy enough
-    raw_data['blank'] = [ data for name, data in data_pairs if name.startswith('blk')]
+    raw_data['blank'] = [ data for name, data in _data_pairs if name.startswith('blk')]
 
     # First collect the standard concentrations the assemble the data
-    std_concs = { name.split('-')[1] for name, data in data_pairs if name.startswith('std') }
+    _std_concs = { name.split('-')[1] for name, data in _data_pairs if name.startswith('std') }
     for conc in std_concs:
         raw_data['standard'][float(conc)] = \
-            [ data for name, data in data_pairs if name.endswith('-' + conc) ]
+            [ data for name, data in _data_pairs if name.endswith(f'-{conc}') ]
 
+    # This version only handles time sequence info, should be more generic
     # Generate a set of tuples with samples and timepoints (deduplicate with a set)
-    sample_set = {tuple(name.split('-')) for name, data in data_pairs \
+    _sample_set = {tuple(name.split('-')) for name, data in _data_pairs \
                             if not name.startswith(('blk', 'std')) }
-    raw_data['data'] = { sample: {} for sample, _ in sample_set}
-    for sample, timepoint in sample_set:
+    raw_data['data'] = { sample: {} for sample, _ in _sample_set}
+    for sample, timepoint in _sample_set:
         raw_data['data'][sample][float(timepoint.lstrip('d'))] = \
-            [ data for name, data in data_pairs \
+            [ data for name, data in _data_pairs \
             if name.startswith(sample) and name.endswith('d' + timepoint)]
 
     return raw_data
