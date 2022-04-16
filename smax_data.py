@@ -9,10 +9,12 @@ import numpy as np
 import scipy.stats
 
 
-def load_plate(filename, return_locations=False):
+def load_plate(filename, trim_junk=True, return_locations=False):
     ''' Open the .txt file to load the data
         Spectramax encodes the degree symbol as \ufffd for some reason, which can't be
         parsed properly, so errors are handled with 'replace'
+        By default, '' data in plate is removed, 
+          if trim_junk is set to False, 8x12 array will be returned and data not coverted to float
         When return_locations is True, function returns 8x12 array with locations where
         data can be found.
         Function will return a larger array if txt file contains multiple plates
@@ -32,7 +34,8 @@ def load_plate(filename, return_locations=False):
         # By default, non-blank data is converted to a float
         if not return_locations:
             plate_data = [ y[2:-2] for y in _raw_data ]
-            plate_data = [ [float(x) for x in y if x!=""] for y in plate_data if y!=['']*12 ]
+            if trim_junk:
+                plate_data = [ [float(x) for x in y if x!=""] for y in plate_data if y!=['']*12 ]
         else:
             plate_data = [ [ x!="" for x in y[2:-2] ] for y in _raw_data ]
 
@@ -73,20 +76,97 @@ def load_settings(settings_file="settings.yml"):
     return settings
 
 
-def load_spec(filename, delimiter='\t'):
+def load_spec(filename, delimiter='\t', trim_junk=True):
     ''' Open the .spec file to load specifications for the plate
         By default, delimiter for these files is a tab
+        By default 'jnk' entries are removed unless trim_junk is set to False
         Since right/left & top/bottom data will be trimmed from plate_data,
         .spec should begin with upper left corner of data range.
     '''
 
-    # Open the .spec file to load the plate formatting
-    with open(filename + '.spec', encoding='utf-8', errors="replace", mode="r") as handle:
-        plate_format = [line.strip().split('\t') for line in handle if line.strip() != '']
+    #Check filename is .spec
+    if filename[-5:] != '.spec':
+        filename = f"{filename}.spec"
 
-    # Should add error checking on format of .spec items
+    # Open the .spec file to load the plate formatting
+    try:
+        with open(filename, encoding='utf-8', errors="replace", mode="r") as handle:
+            plate_format = [line.strip().split(delimiter) for line in handle if line.strip() != '']
+        if trim_junk:
+            plate_format = [ [ fcol for fcol in frow if not fcol.startswith('jnk')] \
+                                    for frow in plate_format ]
+    except FileNotFoundError:
+        print(f"!!! Could not locate {filename}.spec -> FAIL !!!")
 
     return plate_format
+
+
+def check_format(plate_data, plate_format):
+    ''' check formatting of plate_data and plate_format match '''
+    _is_format = [[ col != 'jnk' for col in row_format] for row_format in plate_format ]
+    _is_data = [[ col != '' for col in row_data] for row_data in plate_data ]
+
+    if len(_is_format) != len(_is_data) & len(*_is_format) != len(*_is_data):
+        print("Data and format size mismatch")
+        _is_matched=False
+    else:
+        # More rigorous analysis might be necessary
+        _is_matched = True
+
+    return _is_matched
+
+def generate_blank(plate_data, plate_format):
+    ''' generate array of blank absorbance values from plate
+
+        The generator code to make a 1D array from a 2D source is a bit convoluted to read,
+        but returning (name,data) will confirm it is functional
+    '''
+
+    _blk_data = [ data for frow,drow in zip(plate_format, plate_data) \
+                    for name, data in zip(frow, drow) if name.startswith('blk')]
+
+    return _blk_data
+
+def generate_stds(plate_data, plate_format):
+    ''' generate hash of std concentrations and absorbance data '''
+
+    # Generate list of standard concentrations first
+    _std_concs = { name.split('-')[1] for frow in plate_format \
+                        for name in frow if name.startswith('std-') }
+
+    # Then assemble array of all matching absorbance values
+    _std_data = { float(_conc): [] for _conc in _std_concs}
+    for _conc in _std_concs:
+        _std_data[float(_conc)] = [ data for frow, drow in zip(plate_format, plate_data) \
+                                for name, data in zip(frow, drow) if name==f'std-{_conc}' ]
+
+    return _std_data
+
+def generate_dataset(plate_data, plate_format):
+    ''' generate hash of data names and absorbance
+        data sets are composed on sample names
+        each sample name can have subname (a time sequence, sample # or none)
+        each sample name can have a dilution (assumed 1 if not)
+        generated data set is therefor of format
+        { name1: [(time, dilution), (subname, dilution),...],
+          name2: [(subname, dilution), ...],
+          name3: [(no-name, dilution), ...] }
+
+     '''
+
+    # Generate tuples containing full dataset as (name, time/subname/dilution, and abs data)
+    _datalist = [ (*name.split('-'), data) for frow, drow in zip(plate_format, plate_data) \
+                    for name, data in zip(frow,drow) if not name.startswith(('std', 'blk', 'jnk')) ]
+
+    # Generate list of data names
+    #_datanames = [ name for name, details, data in _datalist ]
+
+    # For each primary data name, generate set of subnames
+    #for dataname in _datanames:
+    #    _dataset[dataname]['subnames'] = { tuple(details.split('_').sort()) for name, details, data in _datalist if name==dataname }
+
+
+    return _datalist #_datanames, _dataset
 
 
 
