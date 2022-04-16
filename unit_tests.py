@@ -14,6 +14,6 @@ for file in files:
         print(len(data), len(data[0]))
         # need to check size of array and match; need to make sure data checks out
     except:
-        pass
+        print("something went wrong")
 
 
