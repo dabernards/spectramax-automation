@@ -133,11 +133,11 @@ def loadFiles(file):
     # Matches against lines with double tab or tab and digit
     # (that's the start of the temperature); ignores empty lines,
     # strips whitespace and splits the by tab
-    with open(file + '.txt', errors='ignore', mode='r') as f:
-        plate_data = [line.strip().split('\t') for line in f \
+    with open(f"{file}.txt", 'r', encoding='utf-8', errors='replace') as handle:
+        raw_data = [line.split('\t') for line in handle \
             if re.match('\t[1-9|\t]', line[0:2]) and line.strip() != '']
-    # Temperature not currently used, so is dropped here
-    _ = plate_data[0].pop(0)
+    plate_data = [ y[2:-2] for y in raw_data ]
+    plate_data = [ [float(x) for x in y if x!=""] for y in plate_data if y!=['']*12 ]
 
     # Read in comma delimited descriptor file
     with open(file + '.spec', errors="ignore", mode="r") as f:
