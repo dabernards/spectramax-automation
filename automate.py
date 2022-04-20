@@ -432,6 +432,10 @@ else:
 
 multi_data = {}
 
+if cli_input['html']:
+    htmlOutput()
+    sys.exit()
+
 for file in file_list:
     if cli_input['local_settings']:
         loadSettings(os.path.dirname(os.path.realpath(file))+"/settings.yml")
@@ -459,8 +463,6 @@ for file in file_list:
         verbose_output()
     if not cli_input['no_logs']:
         generateLog()
-    if cli_input['html']:
-        htmlOutput()
 
 if cli_input['combine']:
     for key in multi_data:
