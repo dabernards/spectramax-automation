@@ -428,8 +428,6 @@ else:
     except:
         pass
 
-if cli_input['file_list'] is not None:
-    file_list = [cli_input['file_list']]
 multi_data = {}
 
 if cli_input['html']:
