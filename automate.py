@@ -315,7 +315,7 @@ def formatOutput(json_data, file, write_data=True):
     data_out = [[] for x in range(row_output+1)]
 
     col_labels = ["day_", "abs_", "abs_sd_", "conc_", "dil_"]
-    device_list = list(raw_data.keys())
+    device_list = list(all_data.keys())
     device_list.sort()
     for device in device_list:
         data_out[0].extend([col_labels[x] + device for x in range(5)])
@@ -326,7 +326,6 @@ def formatOutput(json_data, file, write_data=True):
                 data_out[i+1].extend("" for i in range(5))
                 continue
             data_out[i+1].extend(str(all_data[device][j][i]) for j in range(5))
-
     if write_data:
         with open(file + '.out', 'w') as f:
             for line in data_out:
