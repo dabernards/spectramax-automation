@@ -64,6 +64,8 @@ parser.add_argument('--check-upper', metavar='x', type=float, \
     factor of x of highest standard curve data point')
 parser.add_argument('--fit-only', action='store_true', \
     help='Do not generate output files for each file')
+parser.add_argument('--dict', action='store_true', \
+    help='Output combined data in json format')
 
 cli_input = vars(parser.parse_args())
 if False:
@@ -466,3 +468,6 @@ if cli_input['combine']:
     for key in multi_data:
         multi_data[key].sort()
     formatOutput(multi_data, "all_data")
+    if cli_input['dict']:
+        with open('all_data.dict', 'w') as f:
+            json.dump(multi_data, f)
