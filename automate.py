@@ -214,6 +214,8 @@ def fitStandards(raw_std, abs_blk, omit_lower, omit_upper, plot_data):
 
 def processData(plate_data, plate_format):
     """ process data into blanks, standards, and raw data"""
+    print(plate_data)
+    print(plate_format)
     loc_blk = []
     loc_std = {}
     loc_data = {}
@@ -259,14 +261,14 @@ def processData(plate_data, plate_format):
                     loc_data[data_name][data_time] = []
                 loc_data[data_name][data_time].append((row, col, data_dilution))
 
-    raw_blk = [float(plate_data[row][col]) for [row, col] in loc_blk]
+    raw_blk = [float(plate_data[row][col]) for row, col in loc_blk]
 
     ## FUTURE FEATURE -- checkBlank -- this should get integrated into checkBlank behavior
 
     # Put standards into raw_std dictionary
     raw_std = {}
     for key in loc_std:
-        raw_std[key] = [float(plate_data[row][col]) for [row, col] in loc_std[key]]
+        raw_std[key] = [float(plate_data[row][col]) for row, col in loc_std[key]]
 
     raw_data = {}
     dilution_data = {}
