@@ -214,8 +214,6 @@ def fitStandards(raw_std, abs_blk, omit_lower, omit_upper, plot_data):
 
 def processData(plate_data, plate_format):
     """ process data into blanks, standards, and raw data"""
-    print(plate_data)
-    print(plate_format)
     loc_blk = []
     loc_std = {}
     loc_data = {}
