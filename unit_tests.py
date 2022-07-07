@@ -62,27 +62,34 @@ class SmaxFileTests(unittest.TestCase):
         except OSError:
             pass
 
+    def test_data_load_exists(self):
+        ''' Confirm exception when file doesn't exist '''
+        with self.assertRaises(IOError):
+            data_load('')
 
     def test_data_load_type(self):
         ''' Confirm plate_data is a list '''
-        plate_data = data_load(self.txtfilename)
-        self.assertTrue(isinstance(plate_data, list))
+        self.assertTrue(isinstance(data_load(self.txtfilename), list))
 
     def test_data_load_rows(self):
         ''' Confirm plate_data has 0<row<9 '''
-        plate_data = data_load(self.txtfilename)
-        self.assertTrue(len(plate_data) in list(range(1,9)))
+        self.assertTrue(len(data_load(self.txtfilename)) in range(1,9))
 
     def test_data_load_cols(self):
         ''' Confirm plate_data has 0<columns<13 and all rows have same column # '''
         plate_data = data_load(self.txtfilename)
         cols = { len(row) for row in plate_data }
-        self.assertTrue(len(cols)==1 and list(cols)[0] in range(1,13))
+        self.assertTrue(len(cols)==1 and cols.pop() in range(1,13))
 
     def test_data_load_allfloat(self):
         ''' confirm all plate data is type float '''
-        pass
+        plate_data = data_load(self.txtfilename)
+        self.assertTrue([isinstance(x, float) for row in plate_data for x in row])
 
+    def test_spec_load_exists(self):
+        ''' Confirm exception when file doesn't exist '''
+        with self.assertRaises(IOError):
+            spec_load('')
 
     def test_spec_load_type(self):
         ''' Confirm plate_format is a list '''
@@ -92,13 +99,13 @@ class SmaxFileTests(unittest.TestCase):
     def test_spec_load_rows(self):
         ''' Confirm plate_format has 0<row<9 '''
         plate_format = spec_load(self.specfilename)
-        self.assertTrue(len(plate_format) in list(range(1,9)))
+        self.assertTrue(len(plate_format) in range(1,9))
 
     def test_spec_load_cols(self):
         ''' Confirm plate_format has 0<columns<13 and all rows have same column # '''
         plate_format = spec_load(self.specfilename)
         cols = { len(row) for row in plate_format }
-        self.assertTrue(len(cols)==1 and list(cols)[0] in range(1,13))
+        self.assertTrue(len(cols)==1 and cols.pop() in range(1,13))
 
 
 
