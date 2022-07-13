@@ -5,8 +5,6 @@
 
 
 '''
-from fileops import data_load, spec_load
-
 import sys
 #import os
 #import time
@@ -18,17 +16,40 @@ import sys
 import numpy as np
 import scipy.stats
 
+from fileops import data_load, spec_load
+
+
 
 class SmaxData:
     ''' Basic functions for a plate reader data set '''
 
     def __init__(self, filename):
-        self._plate_data = data_load(filename)
-        self._plate_spec = spec_load(filename)
+        self._plate_data = data_load(f'{filename}.txt')
+        self._plate_spec = spec_load(f'{filename}.spec')
 
-        self.conc_std, self.abs_std, self.abs_blk = self._load_stds()
+        self.abs_blk = self._load_blk()
+        self.conc_std, self.abs_std = self._load_stds()
         self.std_avg, self.blk_avg = self._average_abs()
         self.data = self._load_data()
+
+    def flat_data(self):
+        ''' Combines specification and data into single 1-D array
+
+            Returns:
+                List of tuples with specification and absorbance for each well
+        '''
+        return [x for y,z in zip(self._plate_spec ,self._plate_data) for x in zip(y,z)]
+
+
+    def _load_blk(self):
+        ''' Function pulls all blank wells
+
+            Returns:
+                List of absorbance values for blank wells
+        '''
+        abs_blk = [ ab for fmt, ab in self.flat_data() if fmt=='blk']
+
+        return abs_blk
 
     def _load_stds(self):
         ''' Function pulls all concentration-standard data from data set
@@ -37,18 +58,13 @@ class SmaxData:
                 Sorted concentration and absorbance lists
         '''
 
-        # Creates list of tuples w/ format and absorbance
-        combined_data = [x for y,z in zip(self._plate_spec ,self._plate_data) for x in zip(y,z)]
+        conc_std = sorted({float(x[4:]) for x, _ in self.flat_data() if x.startswith("std-")})
 
-        conc_std = sorted({float(x[4:]) for x, _ in combined_data if x.startswith("std-")})
-
-        abs_std = [ [ ab for fmt, ab in combined_data if \
+        abs_std = [ [ ab for fmt, ab in self.flat_data() if \
                         fmt.startswith('std-') and float(fmt[4:])==conc ]\
                         for conc in conc_std ]
 
-        abs_blk = [ ab for fmt, ab in combined_data if fmt=='blk']
-
-        return conc_std, abs_std, abs_blk
+        return conc_std, abs_std
 
     def _load_data(self):
         ''' Function pulls all concentration-standard data from data set
@@ -60,18 +76,31 @@ class SmaxData:
         # Creates list of tuples w/ format and absorbance
         combined_data = [x for y,z in zip(self._plate_spec ,self._plate_data) for x in zip(y,z)]
 
-        sample_list = {x.split('-')[0] for x, _ in combined_data \
-                            if x[:3] not in ('jnk', 'blk', 'std')}
+        simplified_data = [(*fmt.split('-'), ab) for fmt, ab in combined_data \
+                            if fmt[:3] not in ('jnk', 'blk', 'std')]
 
-        sample_abs = { sample: [ ab for fmt, ab in combined_data if sample.split('-') ] \
-                        for sample in sample_list }
+        sample_set = {sample: {y for x, y , _ in simplified_data if x==sample} \
+                            for sample, _, _ in simplified_data}
 
-        return sample_abs
+        # This looks a bit convoluted, but does the job
+        sample_data = { name: { z: \
+                        [c for a,b, c in simplified_data if a==name and b==z] \
+                            for z in y}  \
+                            for name in list(sample_set) \
+                            for x,y in sample_set.items() if x==name}
 
+        return sample_data
+
+        def _process_name(self, name):
+            ''' Process sample ID from spec file '''
+
+            ids = name.split('_')
+
+            return ids
 
     def _truncate_stds(self, omit_lower, omit_upper):
         ''' Truncates standard curve on low/high end to provide better fit
-        
+
             Args:
                 -omit_lower, omit_upper: number of data points on upper and lower end of
                                     standard curve to omit
@@ -104,132 +133,27 @@ class SmaxData:
 
         return fit_results.intercept, fit_results.slope
 
+    def calc_linear(self, omit_lower=0, omit_upper=0):
+        ''' Performs calculations for linear regression of standard curve
 
-
-
-        ''' Collect and organize standards for fit """
-            
             Args:
-                - std_data: dictionary of standards and absorbance data
-                - abs_blk: list of absorbance values for blank wells
-                - plot_data: boolean on whether to plot data using matplotlib
+                - omit_lower, omit_upper: optionally truncate data
 
-        '''
-        # Pass in raw standard data and averaged blk values from checkBlank()
-        # [FUTURE FEATURE] omit_outlier gives option to find outliers (will need to define)
-        # and omit from fitting
-        # Average all abs_in data
-        #conc_std = [key for key in raw_std]
-
-        '''
-        conc_std = list(raw_std.keys())
-        abs_std = [(np.mean(raw_std[key]) - abs_blk) for key in raw_std]
-        abs_std_sd = [(np.std(raw_std[key])) for key in raw_std]
-
-        # Sort, keyed on conc_std -- probably a cleaner way to do this...
-        sorted_list = np.argsort(conc_std)
-        abs_std = [abs_std[x] for x in sorted_list]
-        # abs_std_sd currently is not in use
-        _ = [abs_std[x] for x in sorted_list]
-        conc_std = [conc_std[x] for x in sorted_list]
-
-        # Will want to add some fit options here, check out :
-        # https://scipy-cookbook.readthedocs.io/items/FittingData.html
-        # Adding in finding outliers will be tricky, this might require user input
-        # or something more advanced
-        fit_results = scipy.stats.linregress(abs_std[omit_lower:len(abs_std)-omit_upper], \
-            conc_std[omit_lower:len(abs_std)-omit_upper])
-
-        if not cli_input['no_fit']:
-            writeFitData(file, conc_std, abs_std, fit_results.slope, fit_results.intercept)
-        if plot_data:
-            _ = plt.plot(abs_std, conc_std, 'o', label='Original data', markersize=10)
-            _ = plt.plot(abs_std, [fit_results.slope * x + fit_results.intercept for x in abs_std], \
-                'r', label='Fitted line')
-            _ = plt.legend()
-            _ = plt.loglog()
-            plt.show()
+            Returns:
+                conc_data: concentration data
         '''
 
+        intercept, slope = self.fit_linear()
 
+        conc_data = { name: {a: intercept + slope*np.mean(b) for a,b in y.items()} \
+                            for name in list(self.data) \
+                            for x,y in self.data.items() if x==name}
 
-def process_data(plate_data, plate_format):
-    """ process data into blanks, standards, and raw data"""
-    loc_blk = []
-    loc_std = {}
-    loc_data = {}
-    # Iterate through data in .spec to bucket standards, blanks, and data
-    for row, _ in enumerate(plate_format):
-        for col, plate_item in enumerate(plate_format[row]):
-            data_type = plate_item[0:3]
-
-            # blanket failsafe -- if entry is blank or user goes out of the way to enter 'jnk',
-            # ignore it.
-            if data_type in ("", "jnk"):
-                continue
-
-            # blk locations go into loc_blk
-            if data_type == "blk":
-                loc_blk.append([row, col])
-
-            # std locations go into loc_std -- since concentrations can be anything,
-            # a dictionary is used. If a key exists in the dictionary already --
-            # just append it to the existing array, otherwise an array with the
-            # first entry is required.
-            elif data_type == "std":
-                if float(plate_item[4:]) not in loc_std:
-                    loc_std[float(plate_item[4:])] = []
-                loc_std[float(plate_item[4:])].append([row, col])
-
-            # all other items are considered data and go into loc_data
-            else:
-                data_dilution = 1
-                [data_name, params] = plate_item.split('-')
-                data_name = data_name.strip()
-                for item in params.split('_'):
-                    if item[0] == "d":
-                        data_time = float(item[1:].strip())
-                    elif item[0] == "x":
-                        data_dilution = float(item[1:].strip())
-                    elif item[0] == "n":
-                        data_time = item[1:].strip()
-                    else: pass #for now we just use these two parameters
-                if data_name not in loc_data:
-                    loc_data[data_name] = {}
-                if data_time not in loc_data[data_name]:
-                    loc_data[data_name][data_time] = []
-                loc_data[data_name][data_time].append((row, col, data_dilution))
-
-    raw_blk = [float(plate_data[row][col]) for [row, col] in loc_blk]
-
-    ## FUTURE FEATURE -- checkBlank -- this should get integrated into checkBlank behavior
-
-    # Put standards into raw_std dictionary
-    raw_std = {}
-    for key in loc_std:
-        raw_std[key] = [float(plate_data[row][col]) for [row, col] in loc_std[key]]
-
-    raw_data = {}
-    dilution_data = {}
-    for device_key in loc_data:
-        raw_data[device_key] = {}
-        dilution_data[device_key] = {}
-        for time_key in loc_data[device_key]:
-            raw_data[device_key][time_key] = \
-                [float(plate_data[row][col]) \
-                for (row, col, dilution) in loc_data[device_key][time_key]]
-            dilution_data[device_key][time_key] = \
-                [dilution for (row, col, dilution) in loc_data[device_key][time_key]]
-    print(dilution_data)
-  # Inelegant way, just want to flatten dilution data -- risky for unaware users
-    for device_key in loc_data:
-        for time_key in loc_data[device_key]:
-            dilution_data[device_key][time_key] = np.mean(dilution_data[device_key][time_key])
+        return conc_data
 
 
 
-    return raw_blk, raw_std, raw_data, dilution_data
-
+'''
 
 def dataQC(json_data):
     """ perform quality analysis on data """
@@ -241,3 +165,11 @@ def dataQC(json_data):
                     bad_data[device] = []
                 bad_data[device].append(str(item[0]))
     return bad_data
+'''
+
+
+if __name__ == '__main__':
+    data = SmaxData("/home/dab68/Sync/UCSF/Data"
+                    "/220701 - ABS - TAc240 MF248 - TAc and MF elution"
+                    "/20220701 - TAc240 - TAC1-4 TAc11-14 release")
+    print(data.calc_linear(0,0))
