@@ -6,15 +6,7 @@
 
 '''
 import sys
-#import os
-#import time
-#import re
-#import json
-#import argparse ## https://docs.python.org/3/library/argparse.html
-#import yaml
-#import matplotlib.pyplot as plt
 import numpy as np
-import scipy.stats
 
 from fileops import load_data, load_spec
 from fitting import LinearFit
@@ -33,6 +25,8 @@ class SmaxData:
         self.abs_blk = self._load_blk()
         self.conc_std, self.abs_std = self._load_stds()
         self.data = self._load_data()
+        self.fit_params = []
+        self.fit_result = []
 
     def flat_data(self):
         ''' Combines specification and data into single 1-D array
@@ -76,14 +70,12 @@ class SmaxData:
                 Sorted concentration and absorbance lists
         '''
 
-        # Will fail if more than one '-' used in a spec entry, error handling should be in load_spec()
         simplified_data = [(*fmt.split('-'), ab) for fmt, ab in self.flat_data() \
                             if fmt[:3] not in ('jnk', 'blk', 'std')]
 
         sample_set = {sample: {y for x, y , _ in simplified_data if x==sample} \
                             for sample, _, _ in simplified_data}
 
-        # This looks a bit convoluted, but does the job
         sample_data = { name: { self._extract_spec(z): \
                         [c for a,b, c in simplified_data if a==name and b==z] \
                             for z in y}  \
@@ -132,12 +124,6 @@ class SmaxData:
         conc, absb = self._load_stds()
         return conc[self.omit_lower:len(conc)-self.omit_upper], \
                 absb[self.omit_lower:len(absb)-self.omit_upper]
-    """
-    def _average_abs(self):
-        ''' Calcuate averages for absorbance and blanks '''
-
-        return [np.mean(x) for x in self.abs_std], np.mean(self.abs_blk)
-    """
 
     def set_limits(self, omit_lower=0, omit_upper=0):
         ''' Adjust limits for lower and upper points to omit 
@@ -150,17 +136,14 @@ class SmaxData:
         self.omit_upper = omit_upper
         return None
 
-    def func_linear(self, params, x):
-        ''' Linear function for calculations '''
-        return params[1]*x + params[0]
-
 
     def avg_blk(self):
         ''' Returns average blank-well absorbance '''
         return np.mean(self.abs_blk)
 
-    def fit_linear(self):
-        ''' Collect and organize standards for fit """
+
+    def fit_data(self, FitMethod):
+        ''' Use provided FitMethod function to obtain best fit
 
             Args:
                 - omit_lower, omit_upper: optionally truncate data
@@ -170,13 +153,12 @@ class SmaxData:
         '''
 
         ydata, xdata = self._truncate_stds()
-        #fit_result = scipy.stats.linregress(xdata - self.avg_blk(), ydata)
-        params, self.fit_result = LinearFit().curve_fit(xdata, ydata)
-        
-        return params
+        self.fit_params, self.fit_result = FitMethod().fit_method(xdata, ydata)
 
-    def calc_linear(self):
-        ''' Performs calculations for linear regression of standard curve
+        return self.fit_params
+
+    def calc_data(self, FitMethod):
+        ''' Performs calculations using provided fitting method
 
             Args:
                 - omit_lower, omit_upper: optionally truncate data
@@ -185,14 +167,20 @@ class SmaxData:
                 conc_data: concentration data
         '''
 
-        params = self.fit_linear()
+        if self.fit_params == []:
+            self.fit_data(FitMethod)
 
-        conc_data = { name: {tuple(t): n*self.func_linear(params, np.mean(b)-self.avg_blk()) for (*t,n),b in y.items()} \
+        conc_data = { name: {tuple(t): \
+                            n*FitMethod().fit_func(np.mean(b)-self.avg_blk(), *self.fit_params) \
+                            for (*t,n),b in y.items()} \
                             for name in list(self.data) \
                             for x,y in self.data.items() if x==name}
+
         return conc_data
 
 
+    """All the code to generate name/time focuses sequences uses deprecated functions
+    should move all this functionality to an independent module
 
     def conc_time_sequence(self):
         ''' Returns condensed conc_data referenced as time sequence
@@ -233,7 +221,7 @@ class SmaxData:
                     for name, data in self.data.items()}
 
         return abs_data
-
+    """
 
 if __name__ == '__main__':
     data = SmaxData("/home/dab68/Sync/UCSF/Data"
@@ -241,11 +229,11 @@ if __name__ == '__main__':
                     "/20220701 - TAc240 - TAC1-4 TAc11-14 release")
 
 #    print(data.data)
+#    data.fit_data(LinearFit)
+    data.calc_data(LinearFit)
+
 #    print(data.abs_name_list())
 #    print(data.conc_name_list())
 #    print(data.conc_time_sequence())
 #    print(data.abs_name_list2())
 #    print(data._load_stds())
-    data.fit_linear()
-    print(data.fit_result)
-
