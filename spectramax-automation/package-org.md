@@ -17,15 +17,17 @@ Load data from txt export of Spectramax software
 Load data from user-generated spec file
 - [ ] any tools to help facilitate this?
 
+
+## settings.py
+
 #### default_settings(): dict of settings
 - Generate a default settings dictionary
-- [ ] does this belong here?
 
 #### generate_settings(filename='settings.yml'): dict of settings written to file
-Generate a default settings file populated with relevant fields
+- Generate a default settings file populated with relevant fields
 
 #### load_settings(filename='settings.yml', defaults_if_empty=False): dict of settings
-Load settings from yaml file (defaulting to settings.yml)
+- Load settings from yaml file (defaulting to settings.yml)
 
 
 ## smax_calc.py
@@ -36,7 +38,7 @@ Basic functions for a plate reader data set
 
 #### SmaxData.flat_data
 Combines specification and data into single 1-D array
-- [ ] where all is this used? should it be here?
+- [ ] where all is this used? should it be here? -- part of refactoring current SMaxData into subclasses
 
 #### SmaxData.\_load_blk
 Constructs list from all blank wells
@@ -47,12 +49,12 @@ Constructs pair of lists with concentration-standard data (sorted on concentrati
 
 #### SmaxData.\_load_data
 Constructions dictionary containing all sample data
-- [ ] refactor away from complicated constructor to more readable loops?
+~- [ ] refactor away from complicated constructor to more readable loops?~
 
 #### SmaxData.\_extract_spec(spec)
 Process non-sample ID part of spec file to return sub-sample name, time point and dilution
 - [ ] handling of both name and time point
-- [ ] is this tuple to best approach to managing this? consider a class for this data type
+- [ ] is this tuple to best approach to managing this? consider a class for this data type --> yes refactoring
 
 #### SmaxData.\_truncate_stds
 Truncates standard curve on low/high end for use in fitting
@@ -71,14 +73,16 @@ Returns average blank-well absorbance
 - [ ] related to \_load_blk issue
 - [ ] consider this avg blk as default data for class and debug toolset to handle more detail 
 
-#### SmaxData.fit_linear
-Perform a generic linear fit from fitting.py
+#### SmaxData.fit_data
+Perform a fit using function from fitting.py
 - [ ] seems like these fit better fulling in a fitting module
 
-#### SmaxData.calc_linear
-Returns calculated concentrations based on absorbance for linear fit (for plotting)
-- [ ] cosndier moving to fitting modules
-- [ ] this constructor is confusing as all, better to reproduce as a readable conventional for loop
+#### SmaxData.calc_data
+Returns calculated concentrations based on fit function from fitting.py
+~- [ ] this constructor is confusing as all, better to reproduce as a readable conventional for loop~ even worse w/ for loops
+
+### format_data.py (?)
+- [ ] Should have these functions in a data formatting module
 
 #### SmaxData.conc_time_sequence
 Returns condensed conc_data referenced by time, removing name data and dilution (dilutions already applied)
@@ -92,38 +96,21 @@ Returns condensed abs_data referenced by time, removing name data, tuple of calc
 #### SmaxData.abs_name_list(self):
 Returns condensed abs_data referenced by name, removing time data, tuple of calc'd avg & std absb and dilution
 
+
 ## fitting.py
-Provides versitility in fitting options -- extends abilities beyond boring linear fit
+Provides versitility in fitting options -- extends abilities beyond basic linear fit
 
-### class GenericFit:
-Generic class to provide basic elements required from a fitting function
-- [ ] add inverse function as required/expected function?
+#### LinearFit
+Base fitting class using linregress, contains
+- fit_func: y = f(x)
+- inv_func: x = g(y)
+- fit_method: how to determine best fit (scipy.stats.linregress)
 
-#### GenericFit.fit_func(x, a):    #pylint: disable=C0103,R0201
-Default function is just addition, did this since including a linear fit to distinguish
-- [ ] Consider replacing w/ LinearFit as the core module that everything extends, allowing it to be the default
+#### CurveFit(LinearFit)
+Extends LinearFit, employing the more generic scipy.optimize.curve_fit
 
-#### GenericFit.fit_method(xdata, ydata):
-Default fit method for a set of x and y data is scipy.optimize.curve_fit
+#### PowerFit(CurveFit)
+Power function fitting, extends CurveFit class
 
-#### LinearFit(GenericFit)
-Extends the generic fit class, using linregress rather than curve_fit
-
-#### LinearFit.fit_func(self, x, intercept, slope):    #pylint: disable=C0103,W0221
-
-#### LinearFit.curve_fit(self, xdata, ydata):
-For linear fit, use scipy.stats.linregress
-
-#### PowerFit(GenericFit):
-Power function fitting, can reuse generic fit method
-- [ ] Each fit would need to incorporate the curve_fit method if LinearFit used as base class
-- [ ] Alternatively could have NonLinFit extend LinFit with curve_fit method and all other extend NonLinFit w/ their fit function
-    '''
-    def fit_func(self, x, intercept, multip, power):    # pylint: disable=W0221
-        ''' Most generic power-law function includes intercept '''
-        return intercept + multip*x**power
-
-
-
-if __name__ =='__main__':
-    pass
+#### LogisticFit(CurveFit)
+Four-parameter logistic function fitting used commonly for ELISA data, extends CurveFit class
