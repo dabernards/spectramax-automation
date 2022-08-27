@@ -9,6 +9,7 @@
 - [ ] ProcessedData class that ingests SmaxData and provides the name-based/time-based data formats
 - [ ] docs on refactored code
 - [ ] Refactor SmaxData class into subclasses so attribute sets are more manageable (classes for absb, spec, conc data?)
+      - improve how spec processing is handled (shift from the awkward tuple holding everything now)
 - [ ] Use or lose pair_files in fileops.py
 
 ## Completed Items

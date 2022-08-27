@@ -11,11 +11,87 @@ import numpy as np
 from fileops import load_data, load_spec
 from fitting import LinearFit
 
+def flat_data(array1, array2):
+    ''' Combines two 2-D arrays into single 1-D array, where a tuple is generated with
+        each row-column pair
+        Most commonly applied for use with specification and data arrays
+
+        Returns:
+            List of tuples from array1, array2, where each tuple corresponds to a row-column
+    '''
+    return [x for y,z in zip(array1, array2) for x in zip(y,z)]
+
+
+class StdCurve:
+    ''' Self contained standard curve '''
+    def __init__(self, filename, FitMethod):
+        self._filename = filename
+        self._FitMethod = FitMethod
+        self.fit_params = []
+        self.fit_result = []
+        self.omit_lower = 0
+        self.omit_upper = 0
+        self._plate_data = load_data(f'{filename}.txt')
+        self._plate_spec = load_spec(f'{filename}.spec')
+
+        self.abs_blk = self._load_blk()
+        self.conc_std, self.abs_std = self._load_stds()
+
+
+    def _load_blk(self):
+        ''' Constructs list from all blank wells
+
+            Returns:
+                abs_blk: List of absorbance values for blank wells
+        '''
+        abs_blk = [ ab for fmt, ab in self.flat_data() if fmt=='blk']
+
+        return abs_blk
+
+    def _load_stds(self):
+        ''' Constructs pair of list with concentration-standard data from
+            data set, sorted based on concentration
+
+            Returns:
+                conc_std : Sorted list of concentration values
+                abs_std: List of absorbance values to corresponding concentration
+        '''
+
+        conc_std = sorted({float(x[4:]) for x, _ in self.flat_data() if x.startswith("std-")})
+
+        abs_std = [ np.mean([ ab for fmt, ab in self.flat_data() if \
+                        fmt.startswith('std-') and float(fmt[4:])==conc ])\
+                        for conc in conc_std ]
+
+        return conc_std, abs_std
+
+    def avg_blk(self):
+        ''' Returns average blank-well absorbance '''
+        return np.mean(self.abs_blk)
+
+
+    def fit_data(self, FitMethod):
+        ''' Use provided FitMethod function to obtain best fit
+
+            Args:
+                - omit_lower, omit_upper: optionally truncate data
+
+            Returns:
+                intercept, slope
+        '''
+
+        ydata, xdata = self._truncate_stds()
+        self.fit_params, self.fit_result = FitMethod().fit_method(xdata, ydata)
+
+        return self.fit_params
+
+
 
 class SmaxData:
     ''' Basic functions for a plate reader data set '''
 
     def __init__(self, filename):
+        self.fit_params = []
         self.fit_result = []
         self.omit_lower = 0
         self.omit_upper = 0
@@ -25,8 +101,6 @@ class SmaxData:
         self.abs_blk = self._load_blk()
         self.conc_std, self.abs_std = self._load_stds()
         self.data = self._load_data()
-        self.fit_params = []
-        self.fit_result = []
 
     def flat_data(self):
         ''' Combines specification and data into single 1-D array
